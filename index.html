@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>CashControl – Bargeld Rationierer</title>
+
+    <!-- PWA: Manifest + Icons + Android/iOS Home-Screen Support -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CashControl">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .transition-all-200 { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-12 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Top Bar Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                <h1 class="font-bold text-lg tracking-wide text-slate-100">CashControl</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="exportBackup()" title="Backup exportieren" class="text-xs text-slate-500 hover:text-emerald-400 transition-colors">
+                    Export
+                </button>
+                <label class="text-xs text-slate-500 hover:text-emerald-400 transition-colors cursor-pointer">
+                    Import
+                    <input type="file" accept="application/json" onchange="importBackup(event)" class="hidden">
+                </label>
+                <button onclick="resetAllData()" class="text-xs text-slate-500 hover:text-red-400 transition-colors">
+                    Reset
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto px-4 pt-4 space-y-5">
+
+        <!-- Cash Overview Card -->
+        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+            <div class="flex justify-between items-start mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Aktueller Bargeldbestand</span>
+                <button onclick="openModal('incomeModal')" class="text-xs bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-medium transition-all">
+                    + Geld erhalten
+                </button>
+            </div>
+            <div class="text-3xl font-extrabold text-white tracking-tight" id="totalCashDisplay">0,00 €</div>
+
+            <div class="mt-4 pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-400">
+                <span>Verbleibende Tage im Monat: <strong class="text-slate-200" id="daysLeftDisplay">--</strong></span>
+                <span>Empfohlenes Tageslimit: <strong class="text-emerald-400" id="suggestedDailyDisplay">0,00 €</strong></span>
+            </div>
+        </section>
+
+        <!-- Daily Status / Traffic Light Indicator -->
+        <section id="statusCard" class="border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <span id="trafficLightDot" class="w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm"></span>
+                    <h2 class="font-bold text-base text-slate-100">Tagesstatus heute</h2>
+                </div>
+                <span id="statusBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Alles im grünen Bereich
+                </span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between text-xs font-medium">
+                    <span class="text-slate-400">Ausgegeben: <span id="todaySpentDisplay" class="text-slate-200 font-bold">0,00 €</span></span>
+                    <span class="text-slate-400">Ziel-Max: <span id="targetDailyDisplay" class="text-slate-200">0,00 €</span></span>
+                </div>
+                <div class="w-full bg-slate-700/60 rounded-full h-3 overflow-hidden p-0.5">
+                    <div id="dailyProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Impulsschutz Warning Text -->
+            <p id="statusMessage" class="text-xs text-slate-400 mt-3 leading-relaxed">
+                Du bist heute gut im Rahmen. Spontane Zusatzkäufe vermeiden.
+            </p>
+        </section>
+
+        <!-- Quick Expense Form -->
+        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
+            <h2 class="font-bold text-base text-slate-100 mb-3 flex items-center gap-2">
+                <span>⚡</span> Ausgabe eintragen
+            </h2>
+
+            <form id="expenseForm" onsubmit="handleAddExpense(event)" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
+                        <input type="number" id="expenseAmount" step="0.01" min="0.01" placeholder="0,00" required
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Kategorie</label>
+                        <select id="expenseCategory" required
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="Haushalt/Essen">🛒 Essen / Haushalt</option>
+                            <option value="Tabak">🚬 Tabak</option>
+                            <option value="Reptilien">🦎 Reptilien</option>
+                            <option value="Privatkäufe">🛍️ Privatkäufe</option>
+                            <option value="Sonstiges">📦 Sonstiges</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Notiz (Optional)</label>
+                    <input type="text" id="expenseNote" placeholder="z. B. Futtertiere, Supermarkt..."
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl shadow-lg transition-all active:scale-[0.99] text-sm">
+                    Bargeld-Ausgabe buchen
+                </button>
+            </form>
+        </section>
+
+        <!-- Category Budget Breakdown -->
+        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="font-bold text-base text-slate-100">Ausgaben nach Kategorien</h2>
+                <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300"></select>
+            </div>
+            <div id="categoryBreakdown" class="space-y-3"></div>
+        </section>
+
+        <!-- Recent Transactions -->
+        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="font-bold text-base text-slate-100">Letzte Bewegungen</h2>
+                <span class="text-xs text-slate-500" id="txCount">0 Einträge</span>
+            </div>
+            <div id="transactionList" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <p class="text-xs text-slate-500 text-center py-4">Noch keine Buchungen vorhanden.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal: Add Cash / Income -->
+    <div id="incomeModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white">Bargeld erhalten</h3>
+            <form onsubmit="handleAddIncome(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
+                    <input type="number" id="incomeAmount" step="0.01" min="0.01" placeholder="50.00" required
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Quelle</label>
+                    <select id="incomeSource" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                        <option value="Taschengeld Vater">Taschengeld Vater</option>
+                        <option value="Arbeit/Nebenjob">Arbeit / Nebenjob</option>
+                        <option value="Sonstiges Cash">Sonstiges Cash</option>
+                    </select>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeModal('incomeModal')"
+                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                        Abbrechen
+                    </button>
+                    <button type="submit"
+                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                        Hinzufügen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Warning Alert (Impulsschutz) -->
+    <div id="warningModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-amber-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center space-y-4">
+            <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30">
+                ⚠️
+            </div>
+            <div>
+                <h3 class="font-bold text-lg text-white mb-1" id="warningTitle">Achtung: Tageslimit erreicht!</h3>
+                <p class="text-xs text-slate-300 leading-relaxed" id="warningText">
+                    Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?
+                </p>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="cancelPendingExpense()"
+                    class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                    Kauf stoppen
+                </button>
+                <button onclick="confirmPendingExpense()"
+                    class="w-1/2 bg-amber-600 hover:bg-amber-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                    Trotzdem buchen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-4 py-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 z-[60]"></div>
+
+    <script>
+        const STORAGE_KEY = 'cashControl_state_v2';
+
+        let appState = {
+            totalCash: 0,
+            transactions: [] // { id, type: 'income'|'expense', amount, category|source, note, date (ISO) }
+        };
+
+        let pendingExpense = null;
+
+        const CATEGORIES = [
+            { id: 'Haushalt/Essen', label: 'Essen / Haushalt', icon: '🛒', color: 'bg-blue-500' },
+            { id: 'Tabak', label: 'Tabak', icon: '🚬', color: 'bg-amber-500' },
+            { id: 'Reptilien', label: 'Reptilien', icon: '🦎', color: 'bg-emerald-500' },
+            { id: 'Privatkäufe', label: 'Privatkäufe', icon: '🛍️', color: 'bg-purple-500' },
+            { id: 'Sonstiges', label: 'Sonstiges', icon: '📦', color: 'bg-slate-500' }
+        ];
+
+        // ---------- Init ----------
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromStorage();
+            migrateLegacyStorage();
+            populateMonthSelect();
+            renderUI();
+            registerServiceWorker();
+        });
+
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('service-worker.js').catch((err) => {
+                    console.warn('Service Worker Registrierung fehlgeschlagen:', err);
+                });
+            }
+        }
+
+        // ---------- Storage ----------
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (e) {
+                console.error('Speichern fehlgeschlagen:', e);
+                showToast('Speichern fehlgeschlagen – Speicher evtl. voll.');
+            }
+        }
+
+        function loadFromStorage() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && Array.isArray(parsed.transactions)) {
+                        appState = parsed;
+                    }
+                } catch (e) {
+                    console.error('Fehler beim Laden gespeicherter Daten:', e);
+                }
+            }
+        }
+
+        // Übernimmt Daten aus der alten Vorversion (Schlüssel ohne _v2), falls vorhanden
+        function migrateLegacyStorage() {
+            const legacy = localStorage.getItem('cashControl_state');
+            const alreadyMigrated = localStorage.getItem('cashControl_migrated');
+            if (legacy && !alreadyMigrated) {
+                try {
+                    const parsed = JSON.parse(legacy);
+                    if (parsed && Array.isArray(parsed.transactions) && appState.transactions.length === 0) {
+                        appState.totalCash = parsed.totalCash || 0;
+                        appState.transactions = parsed.transactions.map((tx, i) => ({
+                            id: tx.id || `legacy-${i}-${Date.now()}`,
+                            ...tx
+                        }));
+                        saveToStorage();
+                    }
+                } catch (e) {
+                    console.error('Migration fehlgeschlagen:', e);
+                }
+                localStorage.setItem('cashControl_migrated', '1');
+            }
+        }
+
+        function resetAllData() {
+            if (confirm('Möchtest du wirklich alle Bargeld-Daten zurücksetzen? Dies kann nicht rückgängig gemacht werden.')) {
+                appState = { totalCash: 0, transactions: [] };
+                saveToStorage();
+                populateMonthSelect();
+                renderUI();
+                showToast('Alle Daten wurden zurückgesetzt.');
+            }
+        }
+
+        // ---------- Backup Export / Import ----------
+        function exportBackup() {
+            const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const dateStr = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `cashcontrol-backup-${dateStr}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Backup exportiert.');
+        }
+
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (!parsed || !Array.isArray(parsed.transactions)) {
+                        throw new Error('Ungültiges Format');
+                    }
+                    if (confirm('Import überschreibt die aktuellen Daten. Fortfahren?')) {
+                        appState = parsed;
+                        saveToStorage();
+                        populateMonthSelect();
+                        renderUI();
+                        showToast('Backup importiert.');
+                    }
+                } catch (err) {
+                    alert('Die Datei konnte nicht gelesen werden: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // ---------- Helpers ----------
+        function formatEuro(amount) {
+            return (amount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            clearTimeout(window._toastTimeout);
+            window._toastTimeout = setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2200);
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function generateId() {
+            return `tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function getDaysInCurrentMonth() {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        }
+
+        function getDaysRemainingInMonth() {
+            const now = new Date();
+            const totalDays = getDaysInCurrentMonth();
+            const currentDay = now.getDate();
+            return (totalDays - currentDay) + 1;
+        }
+
+        function getTodaySpent() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            return appState.transactions
+                .filter(tx => tx.type === 'expense' && tx.date.startsWith(todayStr))
+                .reduce((sum, tx) => sum + tx.amount, 0);
+        }
+
+        function getAvailableMonths() {
+            const months = new Set(appState.transactions.map(tx => tx.date.substring(0, 7)));
+            months.add(new Date().toISOString().substring(0, 7));
+            return Array.from(months).sort().reverse();
+        }
+
+        function populateMonthSelect() {
+            const select = document.getElementById('categoryMonthSelect');
+            const current = select.value;
+            const months = getAvailableMonths();
+            select.innerHTML = months.map(m => `<option value="${m}">${formatMonthLabel(m)}</option>`).join('');
+            select.value = months.includes(current) ? current : months[0];
+        }
+
+        function formatMonthLabel(monthStr) {
+            const [year, month] = monthStr.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+            return date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        }
+
+        function getExpensesByCategoryForMonth(monthStr) {
+            const categorySums = {};
+            CATEGORIES.forEach(c => categorySums[c.id] = 0);
+
+            appState.transactions
+                .filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr))
+                .forEach(tx => {
+                    if (categorySums[tx.category] !== undefined) {
+                        categorySums[tx.category] += tx.amount;
+                    } else {
+                        categorySums['Sonstiges'] += tx.amount;
+                    }
+                });
+
+            return categorySums;
+        }
+
+        // ---------- Expense Flow ----------
+        function handleAddExpense(event) {
+            event.preventDefault();
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const category = document.getElementById('expenseCategory').value;
+            const note = document.getElementById('expenseNote').value.trim();
+
+            if (!amount || amount <= 0) return;
+
+            if (amount > appState.totalCash) {
+                pendingExpense = { amount, category, note, overBudget: 'cash' };
+                document.getElementById('warningTitle').innerText = 'Nicht genug Bargeld!';
+                document.getElementById('warningText').innerText =
+                    `Dein Bargeldbestand beträgt nur ${formatEuro(appState.totalCash)}. Trotzdem als Ausgabe verbuchen (Bestand geht auf 0,00 €)?`;
+                openModal('warningModal');
+                return;
+            }
+
+            const todaySpent = getTodaySpent();
+            const daysRemaining = getDaysRemainingInMonth();
+            const targetDailyLimit = daysRemaining > 0 ? (appState.totalCash / daysRemaining) : 0;
+
+            if (targetDailyLimit > 0 && (todaySpent + amount) > targetDailyLimit) {
+                pendingExpense = { amount, category, note, overBudget: 'daily' };
+                document.getElementById('warningTitle').innerText = 'Achtung: Tageslimit erreicht!';
+                document.getElementById('warningText').innerText =
+                    'Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?';
+                openModal('warningModal');
+                return;
+            }
+
+            commitExpense(amount, category, note);
+        }
+
+        function commitExpense(amount, category, note) {
+            const tx = {
+                id: generateId(),
+                type: 'expense',
+                amount: amount,
+                category: category,
+                note: note,
+                date: new Date().toISOString()
+            };
+            appState.transactions.unshift(tx);
+            appState.totalCash = Math.max(0, appState.totalCash - amount);
+            saveToStorage();
+            document.getElementById('expenseForm').reset();
+            populateMonthSelect();
+            renderUI();
+            showToast('Ausgabe gebucht: ' + formatEuro(amount));
+        }
+
+        function confirmPendingExpense() {
+            if (pendingExpense) {
+                commitExpense(pendingExpense.amount, pendingExpense.category, pendingExpense.note);
+                pendingExpense = null;
+            }
+            closeModal('warningModal');
+        }
+
+        function cancelPendingExpense() {
+            pendingExpense = null;
+            closeModal('warningModal');
+        }
+
+        // ---------- Income Flow ----------
+        function handleAddIncome(event) {
+            event.preventDefault();
+            const amount = parseFloat(document.getElementById('incomeAmount').value);
+            const source = document.getElementById('incomeSource').value;
+            if (!amount || amount <= 0) return;
+
+            const tx = {
+                id: generateId(),
+                type: 'income',
+                amount: amount,
+                source: source,
+                date: new Date().toISOString()
+            };
+            appState.transactions.unshift(tx);
+            appState.totalCash += amount;
+            saveToStorage();
+            event.target.reset();
+            closeModal('incomeModal');
+            populateMonthSelect();
+            renderUI();
+            showToast('Bargeld erhalten: ' + formatEuro(amount));
+        }
+
+        // ---------- Delete ----------
+        function deleteTransaction(id) {
+            const tx = appState.transactions.find(t => t.id === id);
+            if (!tx) return;
+            if (!confirm('Diese Buchung wirklich löschen?')) return;
+
+            if (tx.type === 'expense') {
+                appState.totalCash += tx.amount;
+            } else {
+                appState.totalCash = Math.max(0, appState.totalCash - tx.amount);
+            }
+            appState.transactions = appState.transactions.filter(t => t.id !== id);
+            saveToStorage();
+            populateMonthSelect();
+            renderUI();
+            showToast('Buchung gelöscht.');
+        }
+
+        // ---------- Render ----------
+        function renderUI() {
+            document.getElementById('totalCashDisplay').innerText = formatEuro(appState.totalCash);
+
+            const daysRemaining = getDaysRemainingInMonth();
+            document.getElementById('daysLeftDisplay').innerText = daysRemaining;
+
+            const todaySpent = getTodaySpent();
+            const availableCash = Math.max(0, appState.totalCash);
+            const targetDailyLimit = daysRemaining > 0 ? (availableCash / daysRemaining) : 0;
+
+            document.getElementById('suggestedDailyDisplay').innerText = formatEuro(targetDailyLimit);
+            document.getElementById('targetDailyDisplay').innerText = formatEuro(targetDailyLimit);
+            document.getElementById('todaySpentDisplay').innerText = formatEuro(todaySpent);
+
+            renderTrafficLight(todaySpent, targetDailyLimit);
+            renderCategoryBreakdown();
+            renderTransactions();
+        }
+
+        function renderTrafficLight(spent, limit) {
+            const statusCard = document.getElementById('statusCard');
+            const dot = document.getElementById('trafficLightDot');
+            const badge = document.getElementById('statusBadge');
+            const message = document.getElementById('statusMessage');
+            const progressBar = document.getElementById('dailyProgressBar');
+
+            let ratio = limit > 0 ? (spent / limit) : (spent > 0 ? 1 : 0);
+            let pct = Math.min(100, Math.round(ratio * 100));
+
+            progressBar.style.width = pct + '%';
+            statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 ";
+
+            if (spent > limit && limit > 0) {
+                statusCard.classList.add('border-red-500/50', 'bg-red-950/20');
+                dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
+                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
+                badge.innerText = "Limit überschritten!";
+                message.innerText = "Achtung: Du hast dein Tagesziel überschritten. Stopper einlegen: Brauchst du weitere Käufe heute wirklich?";
+                progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
+            } else if (ratio >= 0.75) {
+                statusCard.classList.add('border-amber-500/50', 'bg-amber-950/20');
+                dot.className = "w-3.5 h-3.5 rounded-full bg-amber-500 inline-block shadow-sm";
+                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                badge.innerText = "Warnung: Fast am Limit";
+                message.innerText = "Du näherst dich deinem Tageslimit. Halte inne und vermeide weitere spontane Ausgaben.";
+                progressBar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
+            } else {
+                statusCard.classList.add('border-slate-700');
+                dot.className = "w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm";
+                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                badge.innerText = "Im grünen Bereich";
+                message.innerText = "Gutes Haushalten! Du bist voll auf Kurs mit deinem Bargeld-Budget.";
+                progressBar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
+            }
+        }
+
+        function renderCategoryBreakdown() {
+            const container = document.getElementById('categoryBreakdown');
+            const selectedMonth = document.getElementById('categoryMonthSelect').value || new Date().toISOString().substring(0, 7);
+            const monthlyData = getExpensesByCategoryForMonth(selectedMonth);
+
+            const totalSpentMonth = Object.values(monthlyData).reduce((a, b) => a + b, 0);
+
+            if (totalSpentMonth === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">Keine Ausgaben in diesem Monat.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+
+            CATEGORIES.forEach(cat => {
+                const spent = monthlyData[cat.id] || 0;
+                const pct = totalSpentMonth > 0 ? Math.round((spent / totalSpentMonth) * 100) : 0;
+
+                const itemHtml = `
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-300 font-medium flex items-center gap-1.5">
+                                <span>${cat.icon}</span> ${cat.label}
+                            </span>
+                            <span class="text-slate-400 font-semibold">${formatEuro(spent)} <span class="text-slate-500">(${pct}%)</span></span>
+                        </div>
+                        <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+                            <div class="${cat.color} h-full rounded-full" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += itemHtml;
+            });
+        }
+
+        function renderTransactions() {
+            const container = document.getElementById('transactionList');
+            const countDisplay = document.getElementById('txCount');
+
+            countDisplay.innerText = `${appState.transactions.length} Einträge`;
+
+            if (appState.transactions.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Noch keine Buchungen vorhanden.</p>';
+                return;
+            }
+
+            const recent = appState.transactions.slice(0, 30);
+
+            container.innerHTML = recent.map(tx => {
+                const isExpense = tx.type === 'expense';
+                const cat = CATEGORIES.find(c => c.id === tx.category);
+                const icon = isExpense ? (cat ? cat.icon : '📦') : '💶';
+                const label = isExpense ? (cat ? cat.label : tx.category) : (tx.source || 'Einnahme');
+                const dateLabel = new Date(tx.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                const sign = isExpense ? '−' : '+';
+                const colorClass = isExpense ? 'text-red-400' : 'text-emerald-400';
+
+                return `
+                    <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-3 py-2.5">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <span class="text-lg leading-none">${icon}</span>
+                            <div class="min-w-0">
+                                <div class="text-xs font-medium text-slate-200 truncate">${label}${tx.note ? ' · ' + escapeHtml(tx.note) : ''}</div>
+                                <div class="text-[10px] text-slate-500">${dateLabel}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
+                            <button onclick="deleteTransaction('${tx.id}')" class="text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen">✕</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.innerText = str;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
