@@ -770,12 +770,13 @@
 
         // ---------- A2: Recompute Total Cash ----------
         function recomputeTotalCash() {
+            // S1+S2: Number() erzwingt numerische Addition statt String-Konkatenation
             const incomeSum = appState.transactions
                 .filter(tx => tx.type === 'income')
-                .reduce((sum, tx) => sum + tx.amount, 0);
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
             const expenseSum = appState.transactions
                 .filter(tx => tx.type === 'expense')
-                .reduce((sum, tx) => sum + tx.amount, 0);
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
             appState.totalCash = Math.round((incomeSum - expenseSum) * 100) / 100;
         }
 
@@ -862,9 +863,11 @@
         function saveToStorage() {
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+                return true;
             } catch (e) {
                 console.error('Speichern fehlgeschlagen:', e);
                 showToast('Speichern fehlgeschlagen – Speicher evtl. voll.');
+                return false;
             }
         }
 
@@ -1171,7 +1174,12 @@
                     skipped++;
                     return;
                 }
-                validTransactions.push(tx);
+                // S1+S4: Beträge und IDs normalisieren
+                validTransactions.push({
+                    ...tx,
+                    amount: Math.round(amount * 100) / 100,
+                    id: String(tx.id ?? '') || generateId()
+                });
             });
 
             const validReservations = [];
@@ -1191,8 +1199,26 @@
                         skipped++;
                         return;
                     }
-                    validReservations.push(res);
+                    // S1+S4: Beträge und IDs normalisieren
+                    validReservations.push({
+                        ...res,
+                        amount: Math.round(amount * 100) / 100,
+                        id: String(res.id ?? '') || generateId()
+                    });
                 });
+            }
+
+            // S7: budgets und settings nur übernehmen, wenn sie echte Objekte sind
+            if (budgets && typeof budgets === 'object' && !Array.isArray(budgets)) {
+                // budgets ist ein gültiges Objekt
+            } else {
+                budgets = null;
+            }
+
+            if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+                // settings ist ein gültiges Objekt
+            } else {
+                settings = null;
             }
 
             return {
@@ -1286,14 +1312,62 @@
         // ---------- Helpers ----------
         function parseAmount(str) {
             if (typeof str !== 'string') return NaN;
-            const normalized = str.replace(/,/g, '.').replace(/\s/g, '');
+
+            // S3: Deutsche Tausendertrennung korrekt handhaben
+            let normalized = str
+                .replace(/\s/g, '')
+                .replace(/€/g, '');
+
+            if (normalized.length === 0) return NaN;
+
+            const hasDot = normalized.includes('.');
+            const hasComma = normalized.includes(',');
+
+            if (hasDot && hasComma) {
+                // Punkt und Komma enthalten: Punkt ist Tausendertrenner, Komma ist Dezimal
+                normalized = normalized.replace(/\./g, '').replace(',', '.');
+            } else if (hasComma && !hasDot) {
+                // Nur Komma: könnte Dezimal oder Tausendertrenner sein
+                const dotCount = (normalized.match(/\./g) || []).length;
+                if (dotCount === 0) {
+                    // Kein Punkt, Komma könnte beides sein
+                    // Wenn Komma ist nicht Dezimal (z.B. "1.500,00" → "1500,00"),
+                    // dann Komma zu Punkt
+                    const commaIndex = normalized.lastIndexOf(',');
+                    if (commaIndex > 0) {
+                        const afterComma = normalized.slice(commaIndex + 1);
+                        if (afterComma.length <= 2) {
+                            // Komma ist wahrscheinlich Dezimalpunkt
+                            normalized = normalized.replace(',', '.');
+                        } else {
+                            // Komma ist Tausendertrenner
+                            normalized = normalized.replace(/,/g, '');
+                        }
+                    }
+                }
+            } else if (hasDot && !hasComma) {
+                // Nur Punkt: genau ein Punkt mit 1-2 Nachkommastellen = Dezimalpunkt
+                const dotIndex = normalized.indexOf('.');
+                const afterDot = normalized.slice(dotIndex + 1);
+                if (afterDot.length > 2) {
+                    // Punkt ist Tausendertrenner
+                    normalized = normalized.replace(/\./g, '');
+                }
+                // Sonst Punkt bleibt als Dezimalpunkt
+            }
+
+            // Prüfe mit Regex: nur Ziffern und optional ein Punkt
+            if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return NaN;
+
             const num = parseFloat(normalized);
             if (!isFinite(num) || num <= 0) return NaN;
             return Math.round(num * 100) / 100;
         }
 
         function formatEuro(amount) {
-            return (amount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+            // S1+S2: Defensiv absichern – Number() erzwingt Zahlenkonversion
+            const n = Number(amount);
+            return (isFinite(n) ? n : 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
         }
 
         function showToast(message) {
@@ -1367,9 +1441,10 @@
 
         function getTodaySpent() {
             const todayKey = toLocalDateKey(new Date());
+            // S1+S2: Number() für sichere Addition
             return appState.transactions
                 .filter(tx => tx.type === 'expense' && txLocalDateKey(tx) === todayKey)
-                .reduce((sum, tx) => sum + tx.amount, 0);
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
         }
 
         // Zustände aus älteren Schema-Versionen (etwa ein Undo-Snapshot) kennen das
@@ -1383,9 +1458,10 @@
 
         function getReservedRemaining() {
             const mk = toLocalMonthKey(new Date());
+            // S1+S2: Number() für sichere Addition
             return getReservations()
                 .filter(r => r.month === mk && !r.done)
-                .reduce((sum, r) => sum + r.amount, 0);
+                .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
         }
 
         function getAvailableAfterReservations() {
@@ -1445,28 +1521,32 @@
 
             const txs = appState.transactions.filter(tx => txLocalMonthKey(tx) === monthKey);
 
+            // S1+S2: Number() für sichere Addition
             const totalIncome = txs
                 .filter(tx => tx.type === 'income')
-                .reduce((sum, tx) => sum + tx.amount, 0);
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
             const totalExpense = txs
                 .filter(tx => tx.type === 'expense')
-                .reduce((sum, tx) => sum + tx.amount, 0);
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
             const saldo = totalIncome - totalExpense;
 
             // Expenses by category
-            const categoryMap = {};
+            // S5: Object.create(null) statt {} um Prototype-Pollution zu verhindern
+            const categoryMap = Object.create(null);
             CATEGORIES.forEach(c => {
                 categoryMap[c.id] = { id: c.id, label: c.label, icon: c.icon, sum: 0, items: [] };
             });
 
             txs.filter(tx => tx.type === 'expense').forEach(tx => {
-                const catId = (categoryMap[tx.category] !== undefined) ? tx.category : 'Sonstiges';
-                categoryMap[catId].sum += tx.amount;
+                // S5: Object.prototype.hasOwnProperty.call für sichere Prüfung
+                const catId = Object.prototype.hasOwnProperty.call(categoryMap, tx.category) ? tx.category : 'Sonstiges';
+                const amount = Number(tx.amount) || 0;
+                categoryMap[catId].sum += amount;
                 categoryMap[catId].items.push({
                     id: tx.id,
-                    amount: tx.amount,
+                    amount: amount,
                     note: tx.note || '',
                     date: tx.date
                 });
@@ -1740,16 +1820,19 @@
         }
 
         function getExpensesByCategoryForMonth(monthStr) {
-            const categorySums = {};
+            // S5: Object.create(null) um Prototype-Pollution zu verhindern
+            const categorySums = Object.create(null);
             CATEGORIES.forEach(c => categorySums[c.id] = 0);
 
             appState.transactions
                 .filter(tx => tx.type === 'expense' && txLocalMonthKey(tx) === monthStr)
                 .forEach(tx => {
-                    if (categorySums[tx.category] !== undefined) {
-                        categorySums[tx.category] += tx.amount;
+                    const amount = Number(tx.amount) || 0;
+                    // S5: Object.prototype.hasOwnProperty.call für sichere Prüfung
+                    if (Object.prototype.hasOwnProperty.call(categorySums, tx.category)) {
+                        categorySums[tx.category] += amount;
                     } else {
-                        categorySums['Sonstiges'] += tx.amount;
+                        categorySums['Sonstiges'] += amount;
                     }
                 });
 
@@ -1833,11 +1916,14 @@
             };
             appState.transactions.unshift(tx);
             recomputeTotalCash();
-            saveToStorage();
+            // S6: Toast nur bei erfolgreichem Speichern anzeigen
+            const saved = saveToStorage();
             document.getElementById('expenseForm').reset();
             populateMonthSelect();
             renderUI();
-            showToast('Ausgabe gebucht: ' + formatEuro(amount));
+            if (saved) {
+                showToast('Ausgabe gebucht: ' + formatEuro(amount));
+            }
         }
 
         function confirmPendingExpense() {
@@ -1875,12 +1961,15 @@
             };
             appState.transactions.unshift(tx);
             recomputeTotalCash();
-            saveToStorage();
+            // S6: Toast nur bei erfolgreichem Speichern anzeigen
+            const saved = saveToStorage();
             event.target.reset();
             closeModal('incomeModal');
             populateMonthSelect();
             renderUI();
-            showToast('Bargeld erhalten: ' + formatEuro(amount));
+            if (saved) {
+                showToast('Bargeld erhalten: ' + formatEuro(amount));
+            }
         }
 
         // ---------- Reservation Flow ----------
@@ -1929,9 +2018,12 @@
             };
 
             getReservations().push(res);
-            saveToStorage();
+            // S6: Toast nur bei erfolgreichem Speichern anzeigen
+            const saved = saveToStorage();
             renderUI();
-            showToast(`Geplante Ausgabe hinzugefügt: ${formatEuro(parsedAmount)}`);
+            if (saved) {
+                showToast(`Geplante Ausgabe hinzugefügt: ${formatEuro(parsedAmount)}`);
+            }
         }
 
         function toggleReservationDone(id) {
@@ -2408,10 +2500,13 @@
                 const amount = value ? parseFloat(value) : 0;
                 appState.budgets[cat.id] = isFinite(amount) && amount > 0 ? amount : 0;
             });
-            saveToStorage();
+            // S6: Toast nur bei erfolgreichem Speichern anzeigen
+            const saved = saveToStorage();
             renderUI();
             closeModal('budgetModal');
-            showToast('Budgets gespeichert.');
+            if (saved) {
+                showToast('Budgets gespeichert.');
+            }
         }
 
         // ---------- A11: Category Budgets (Logik) ----------
