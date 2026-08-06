@@ -579,12 +579,12 @@
     </div>
 
     <!-- Modal: Warning Alert (B6: aria + keyboard) -->
-    <div id="warningModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="warningModalTitle">
+    <div id="warningModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="warningTitle">
         <div class="modal-content">
             <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30 mb-4">
                 ⚠️
             </div>
-            <h3 class="modal-header text-center" id="warningModalTitle">Achtung: Tageslimit erreicht!</h3>
+            <h3 class="modal-header text-center" id="warningTitle">Achtung: Tageslimit erreicht!</h3>
             <p class="text-xs text-slate-300 leading-relaxed mb-4 text-center" id="warningText">
                 Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?
             </p>
@@ -1018,12 +1018,15 @@
 
             if (shouldRemindBackup()) {
                 const lastBackupAt = appState.settings?.lastBackupAt;
-                let daysText = 'noch nie';
                 if (lastBackupAt) {
                     const daysElapsed = Math.floor((now - new Date(lastBackupAt).getTime()) / (1000 * 60 * 60 * 24));
-                    daysText = daysElapsed === 1 ? '1 Tag' : `${daysElapsed} Tagen`;
+                    const daysText = daysElapsed === 0 ? 'heute'
+                        : daysElapsed === 1 ? 'vor 1 Tag'
+                        : `vor ${daysElapsed} Tagen`;
+                    bannerText.textContent = `Letztes Backup ${daysText}`;
+                } else {
+                    bannerText.textContent = 'Noch kein Backup erstellt';
                 }
-                bannerText.textContent = `Letztes Backup vor ${daysText}`;
                 banner.classList.remove('hidden');
             } else {
                 banner.classList.add('hidden');
