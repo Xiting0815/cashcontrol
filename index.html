@@ -927,6 +927,10 @@
                 }
 
                 appState = snap.state;
+                // Snapshot kann aus einer älteren Schema-Version stammen – fehlende
+                // Felder (budgets, settings, reservations) hier ergänzen, sonst
+                // scheitert das anschließende Rendern.
+                migrateState();
                 saveToStorage();
                 localStorage.removeItem('cashControl_undo_v1');
                 populateMonthSelect();
@@ -1207,10 +1211,10 @@
                             });
                         }
                         if (validation.reservations) {
-                            const seenReservations = new Set(appState.reservations.map(r => r.id));
+                            const seenReservations = new Set(getReservations().map(r => r.id));
                             validation.reservations.forEach(res => {
                                 if (!seenReservations.has(res.id)) {
-                                    appState.reservations.push(res);
+                                    getReservations().push(res);
                                 }
                             });
                         }
@@ -1330,9 +1334,18 @@
                 .reduce((sum, tx) => sum + tx.amount, 0);
         }
 
+        // Zustände aus älteren Schema-Versionen (etwa ein Undo-Snapshot) kennen das
+        // Feld noch nicht. Da die Reservierungen an renderUI() und getDailyLimit()
+        // hängen, würde ein fehlendes Feld die gesamte Oberfläche lahmlegen –
+        // deshalb wird es hier an einer Stelle sichergestellt.
+        function getReservations() {
+            if (!Array.isArray(appState.reservations)) appState.reservations = [];
+            return appState.reservations;
+        }
+
         function getReservedRemaining() {
             const mk = toLocalMonthKey(new Date());
-            return appState.reservations
+            return getReservations()
                 .filter(r => r.month === mk && !r.done)
                 .reduce((sum, r) => sum + r.amount, 0);
         }
@@ -1348,7 +1361,7 @@
         function carryOverReservations() {
             const mk = toLocalMonthKey(new Date());
             let count = 0;
-            appState.reservations.forEach(r => {
+            getReservations().forEach(r => {
                 if (r.month < mk && !r.done) {
                     r.month = mk;
                     count++;
@@ -1571,14 +1584,14 @@
                 done: false
             };
 
-            appState.reservations.push(res);
+            getReservations().push(res);
             saveToStorage();
             renderUI();
             showToast(`Geplante Ausgabe hinzugefügt: ${formatEuro(parsedAmount)}`);
         }
 
         function toggleReservationDone(id) {
-            const res = appState.reservations.find(r => r.id === id);
+            const res = getReservations().find(r => r.id === id);
             if (!res) return;
 
             res.done = !res.done;
@@ -1587,11 +1600,11 @@
         }
 
         function deleteReservation(id) {
-            const res = appState.reservations.find(r => r.id === id);
+            const res = getReservations().find(r => r.id === id);
             if (!res) return;
             if (!confirm('Diese geplante Ausgabe wirklich löschen?')) return;
 
-            appState.reservations = appState.reservations.filter(r => r.id !== id);
+            appState.reservations = getReservations().filter(r => r.id !== id);
             saveToStorage();
             renderUI();
             showToast('Geplante Ausgabe gelöscht.');
@@ -1615,7 +1628,7 @@
         function renderReservations() {
             const container = document.getElementById('reservationsList');
             const mk = toLocalMonthKey(new Date());
-            const reservations = appState.reservations.filter(r => r.month === mk);
+            const reservations = getReservations().filter(r => r.month === mk);
 
             if (reservations.length === 0) {
                 container.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>';
@@ -1688,7 +1701,7 @@
                 } else {
                     availableEl.style.color = '#cbd5e1';
                 }
-                availableEl.innerText = formatEuro(Math.abs(available));
+                availableEl.innerText = formatEuro(available);
             } else {
                 reservationInfoEl.classList.add('hidden');
             }
@@ -1723,6 +1736,20 @@
             const badge = document.getElementById('statusBadge');
             const message = document.getElementById('statusMessage');
             const progressBar = document.getElementById('dailyProgressBar');
+
+            const shortfall = getReservationShortfall();
+
+            // B3: Reservation shortfall – geplante Ausgaben übersteigen Bargeld
+            if (shortfall > 0) {
+                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/20 border-red-500/50";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
+                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
+                badge.innerText = "Unterdeckung!";
+                message.innerText = `Deine geplanten Ausgaben übersteigen dein Bargeld um ${formatEuro(shortfall)}. Heute: 0,00 € verfügbar.`;
+                progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
+                progressBar.style.width = "100%";
+                return;
+            }
 
             // B3: Bei Bestand ≤ 0
             if (totalCash <= 0) {
