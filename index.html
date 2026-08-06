@@ -290,10 +290,74 @@
             registerServiceWorker();
         });
 
+        // ========== C4: Installation-Hinweis ==========
+        let deferredInstallPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (event) => {
+          event.preventDefault();
+          deferredInstallPrompt = event;
+        });
+
+        function canInstallApp() {
+          return deferredInstallPrompt !== null;
+        }
+
+        function triggerInstallPrompt() {
+          if (!deferredInstallPrompt) {
+            showToast('App-Installation wird nicht unterstützt.');
+            return;
+          }
+          deferredInstallPrompt.prompt();
+          deferredInstallPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+              showToast('App installiert!');
+            }
+            deferredInstallPrompt = null;
+          });
+        }
+
+        // ========== C5: Update-Hinweis ==========
         function registerServiceWorker() {
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('service-worker.js').catch((err) => {
-                    console.warn('Service Worker Registrierung fehlgeschlagen:', err);
+                navigator.serviceWorker.register('service-worker.js')
+                    .then((registration) => {
+                        let waitingWorker = registration.waiting;
+
+                        // Prüfe direkt beim Register auf einen wartenden Worker
+                        if (waitingWorker) {
+                            promptUserForUpdate(waitingWorker);
+                        }
+
+                        // Höre auf neue installierte Worker
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // Ein neuer Worker ist installiert und es gibt bereits einen aktiven Controller
+                                    promptUserForUpdate(newWorker);
+                                }
+                            });
+                        });
+                    })
+                    .catch((err) => {
+                        console.warn('Service Worker Registrierung fehlgeschlagen:', err);
+                    });
+            }
+        }
+
+        function promptUserForUpdate(worker) {
+            showToast('Neue Version verfügbar – App neu starten.');
+            // Speichere den wartenden Worker für applyUpdate()
+            window._waitingWorker = worker;
+        }
+
+        function applyUpdate() {
+            if (window._waitingWorker) {
+                // Sende SKIP_WAITING an den wartenden Worker
+                window._waitingWorker.postMessage('SKIP_WAITING');
+                // Auf controllerchange warten und neu laden
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    window.location.reload();
                 });
             }
         }
