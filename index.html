@@ -443,6 +443,17 @@
                 <span>Verbleibende Tage: <strong class="text-slate-200" id="daysLeftDisplay">--</strong></span>
                 <span>Tageslimit: <strong class="text-emerald-400" id="suggestedDailyDisplay">0,00 €</strong></span>
             </div>
+
+            <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>davon reserviert:</span>
+                    <span class="text-slate-200 font-semibold" id="reservedAmountDisplay">0,00 €</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>frei verfügbar:</span>
+                    <span class="font-semibold" id="availableAfterReservationsDisplay">0,00 €</span>
+                </div>
+            </div>
         </section>
 
         <!-- B3: Daily Status / Traffic Light Indicator -->
@@ -476,6 +487,42 @@
             <p id="statusMessage" class="text-xs text-slate-400 mt-3 leading-relaxed">
                 Du bist heute gut im Rahmen. Spontane Zusatzkäufe vermeiden.
             </p>
+        </section>
+
+        <!-- Reservations / Geplante Ausgaben Section -->
+        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                    <span>📋</span> Geplante Ausgaben
+                </h2>
+                <span class="text-xs font-semibold text-emerald-400" id="reservedSumDisplay">0,00 €</span>
+            </div>
+
+            <!-- Reservations Input Form (single line) -->
+            <form id="reservationForm" onsubmit="handleAddReservation(event)" class="space-y-3 mb-4 pb-4 border-b border-slate-700/50">
+                <div class="flex gap-2">
+                    <input type="text" id="reservationLabel" placeholder="z.B. Tabak, Arzt..."
+                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                    <input type="text" id="reservationAmount" inputmode="decimal" placeholder="10,00"
+                        class="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                    <select id="reservationCategory" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                        <option value="">Kategorie</option>
+                        <option value="Haushalt/Essen">🛒 Essen</option>
+                        <option value="Tabak">🚬 Tabak</option>
+                        <option value="Reptilien">🦎 Reptilien</option>
+                        <option value="Privatkäufe">🛍️ Privatkäufe</option>
+                        <option value="Sonstiges">📦 Sonstiges</option>
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all active:scale-[0.99]">
+                        Einplanen
+                    </button>
+                </div>
+            </form>
+
+            <!-- Reservations List -->
+            <div id="reservationsList" class="space-y-2">
+                <p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
+            </div>
         </section>
 
         <!-- B4: Quick Expense Form (moved up, before categories) -->
@@ -642,9 +689,10 @@
         let appState = {
             totalCash: 0,
             transactions: [],
-            schemaVersion: 3,
+            schemaVersion: 4,
             budgets: {},
-            settings: { lastBackupAt: null, backupReminderDays: 14 }
+            settings: { lastBackupAt: null, backupReminderDays: 14 },
+            reservations: []
         };
 
         let pendingExpense = null;
@@ -799,7 +847,7 @@
 
         // ---------- A4: Migration ----------
         function migrateState() {
-            if (!appState.schemaVersion) appState.schemaVersion = 3;
+            if (!appState.schemaVersion) appState.schemaVersion = 4;
             if (!appState.budgets) {
                 appState.budgets = {};
                 CATEGORIES.forEach(c => {
@@ -813,6 +861,7 @@
                 };
             }
             if (!appState.transactions) appState.transactions = [];
+            if (!appState.reservations) appState.reservations = [];
 
             appState.transactions.forEach((tx, i) => {
                 if (!tx.id) {
@@ -821,6 +870,7 @@
             });
 
             recomputeTotalCash();
+            carryOverReservations();
         }
 
         function migrateLegacyStorage() {
@@ -911,9 +961,10 @@
                 appState = {
                     totalCash: 0,
                     transactions: [],
-                    schemaVersion: 3,
+                    schemaVersion: 4,
                     budgets: {},
-                    settings: { lastBackupAt: null, backupReminderDays: 14 }
+                    settings: { lastBackupAt: null, backupReminderDays: 14 },
+                    reservations: []
                 };
                 CATEGORIES.forEach(c => { appState.budgets[c.id] = 0; });
                 saveToStorage();
@@ -935,7 +986,7 @@
         function exportBackup() {
             const backup = {
                 app: 'cashcontrol',
-                schemaVersion: 3,
+                schemaVersion: 4,
                 exportedAt: new Date().toISOString(),
                 data: appState
             };
@@ -1040,23 +1091,26 @@
 
         // ---------- A6: Backup-Validierung ----------
         function validateBackup(obj) {
-            if (!obj) return { ok: false, data: null, error: 'Datei ist leer', skipped: 0, budgets: null, settings: null };
+            if (!obj) return { ok: false, data: null, error: 'Datei ist leer', skipped: 0, budgets: null, settings: null, reservations: null };
 
             let transactions = [];
             let skipped = 0;
             let budgets = null;
             let settings = null;
+            let reservations = null;
 
             if (obj.app === 'cashcontrol' && obj.data && Array.isArray(obj.data.transactions)) {
                 transactions = obj.data.transactions;
                 budgets = obj.data.budgets || null;
                 settings = obj.data.settings || null;
+                reservations = obj.data.reservations || null;
             } else if (Array.isArray(obj.transactions)) {
                 transactions = obj.transactions;
                 budgets = obj.budgets || null;
                 settings = obj.settings || null;
+                reservations = obj.reservations || null;
             } else {
-                return { ok: false, data: null, error: 'Keine Transaktionen gefunden', skipped: 0, budgets: null, settings: null };
+                return { ok: false, data: null, error: 'Keine Transaktionen gefunden', skipped: 0, budgets: null, settings: null, reservations: null };
             }
 
             const validTransactions = [];
@@ -1078,13 +1132,35 @@
                 validTransactions.push(tx);
             });
 
+            const validReservations = [];
+            if (Array.isArray(reservations)) {
+                reservations.forEach(res => {
+                    if (typeof res.label !== 'string' || !res.label.trim()) {
+                        skipped++;
+                        return;
+                    }
+                    const amount = parseFloat(res.amount);
+                    if (!isFinite(amount) || amount <= 0) {
+                        skipped++;
+                        return;
+                    }
+                    const monthMatch = String(res.month).match(/^\d{4}-\d{2}$/);
+                    if (!monthMatch) {
+                        skipped++;
+                        return;
+                    }
+                    validReservations.push(res);
+                });
+            }
+
             return {
                 ok: true,
                 data: validTransactions,
                 error: null,
                 skipped: skipped,
                 budgets: budgets,
-                settings: settings
+                settings: settings,
+                reservations: validReservations.length > 0 ? validReservations : null
             };
         }
 
@@ -1112,6 +1188,7 @@
                         appState.transactions = validation.data;
                         appState.budgets = validation.budgets || appState.budgets || {};
                         appState.settings = validation.settings || appState.settings || { lastBackupAt: null, backupReminderDays: 14 };
+                        appState.reservations = validation.reservations || [];
                     } else if (mode === 'merge') {
                         saveUndoSnapshot();
                         const merged = [...appState.transactions, ...validation.data];
@@ -1126,6 +1203,14 @@
                             CATEGORIES.forEach(c => {
                                 if (appState.budgets[c.id] === undefined) {
                                     appState.budgets[c.id] = validation.budgets[c.id] || 0;
+                                }
+                            });
+                        }
+                        if (validation.reservations) {
+                            const seenReservations = new Set(appState.reservations.map(r => r.id));
+                            validation.reservations.forEach(res => {
+                                if (!seenReservations.has(res.id)) {
+                                    appState.reservations.push(res);
                                 }
                             });
                         }
@@ -1245,9 +1330,42 @@
                 .reduce((sum, tx) => sum + tx.amount, 0);
         }
 
+        function getReservedRemaining() {
+            const mk = toLocalMonthKey(new Date());
+            return appState.reservations
+                .filter(r => r.month === mk && !r.done)
+                .reduce((sum, r) => sum + r.amount, 0);
+        }
+
+        function getAvailableAfterReservations() {
+            return appState.totalCash - getReservedRemaining();
+        }
+
+        function getReservationShortfall() {
+            return Math.max(0, getReservedRemaining() - appState.totalCash);
+        }
+
+        function carryOverReservations() {
+            const mk = toLocalMonthKey(new Date());
+            let count = 0;
+            appState.reservations.forEach(r => {
+                if (r.month < mk && !r.done) {
+                    r.month = mk;
+                    count++;
+                }
+            });
+            if (count > 0) {
+                saveToStorage();
+                const msg = `${count} geplante Ausgabe${count === 1 ? '' : 'n'} in den neuen Monat übernommen.`;
+                showToast(msg);
+            }
+            return count;
+        }
+
         function getDailyLimit() {
-            const daysRemaining = getDaysRemainingInMonth();
-            return (appState.totalCash + getTodaySpent()) / Math.max(1, daysRemaining);
+            const days = Math.max(1, getDaysRemainingInMonth());
+            const verfuegbar = appState.totalCash + getTodaySpent() - getReservedRemaining();
+            return Math.max(0, verfuegbar) / days;
         }
 
         function getAvailableMonths() {
@@ -1408,6 +1526,17 @@
             showToast('Bargeld erhalten: ' + formatEuro(amount));
         }
 
+        // ---------- Reservation Flow ----------
+        function handleAddReservation(event) {
+            event.preventDefault();
+            const label = document.getElementById('reservationLabel').value;
+            const amountStr = document.getElementById('reservationAmount').value;
+            const category = document.getElementById('reservationCategory').value;
+
+            addReservation(label, amountStr, category || null);
+            event.target.reset();
+        }
+
         // ---------- Delete ----------
         function deleteTransaction(id) {
             const tx = appState.transactions.find(t => t.id === id);
@@ -1420,6 +1549,52 @@
             populateMonthSelect();
             renderUI();
             showToast('Buchung gelöscht.');
+        }
+
+        // ---------- Reservations CRUD ----------
+        function addReservation(label, amount, category) {
+            const parsedAmount = parseAmount(amount);
+            if (isNaN(parsedAmount)) {
+                showToast('Bitte einen gültigen Betrag eingeben.');
+                return;
+            }
+
+            const finalLabel = label.trim() || 'Geplante Ausgabe';
+            const mk = toLocalMonthKey(new Date());
+
+            const res = {
+                id: generateId(),
+                label: finalLabel,
+                amount: parsedAmount,
+                category: category || null,
+                month: mk,
+                done: false
+            };
+
+            appState.reservations.push(res);
+            saveToStorage();
+            renderUI();
+            showToast(`Geplante Ausgabe hinzugefügt: ${formatEuro(parsedAmount)}`);
+        }
+
+        function toggleReservationDone(id) {
+            const res = appState.reservations.find(r => r.id === id);
+            if (!res) return;
+
+            res.done = !res.done;
+            saveToStorage();
+            renderUI();
+        }
+
+        function deleteReservation(id) {
+            const res = appState.reservations.find(r => r.id === id);
+            if (!res) return;
+            if (!confirm('Diese geplante Ausgabe wirklich löschen?')) return;
+
+            appState.reservations = appState.reservations.filter(r => r.id !== id);
+            saveToStorage();
+            renderUI();
+            showToast('Geplante Ausgabe gelöscht.');
         }
 
         // B8: Transaction Filter
@@ -1436,6 +1611,58 @@
             renderTransactions();
         }
 
+        // ---------- Render Reservations ----------
+        function renderReservations() {
+            const container = document.getElementById('reservationsList');
+            const mk = toLocalMonthKey(new Date());
+            const reservations = appState.reservations.filter(r => r.month === mk);
+
+            if (reservations.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>';
+                return;
+            }
+
+            container.innerHTML = reservations.map(res => {
+                const cat = CATEGORIES.find(c => c.id === res.category);
+                const categoryIcon = cat ? cat.icon : '';
+                const categoryLabel = cat ? cat.label : (res.category || '');
+                const categoryDisplay = res.category ? ` · ${categoryIcon} ${escapeHtml(categoryLabel)}` : '';
+                const doneClass = res.done ? 'line-through opacity-50' : '';
+                const doneStateClass = res.done ? 'bg-slate-700/40' : 'bg-slate-900/60';
+
+                return `
+                    <div class="flex items-center justify-between ${doneStateClass} rounded-lg px-3 py-2.5">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-xs font-medium text-slate-200 ${doneClass}">${escapeHtml(res.label)}${categoryDisplay}</div>
+                            <div class="text-sm font-semibold text-slate-400 ${doneClass}">${formatEuro(res.amount)}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button class="reservationDoneBtn text-xs px-2 py-1.5 rounded-md transition-all ${res.done ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}" title="${res.done ? 'Rückgängig' : 'Erledigt'}" data-id="${escapeAttr(res.id)}">
+                                ${res.done ? '✓' : '○'}
+                            </button>
+                            <button class="reservationDeleteBtn text-xs px-2 py-1.5 text-slate-600 hover:text-red-400 rounded-md transition-all hover:bg-red-500/10" title="Löschen" data-id="${escapeAttr(res.id)}">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Delegierter Listener
+            if (!container._delegateListenerAdded) {
+                container.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('reservationDoneBtn')) {
+                        const id = e.target.dataset.id;
+                        toggleReservationDone(id);
+                    } else if (e.target.classList.contains('reservationDeleteBtn')) {
+                        const id = e.target.dataset.id;
+                        deleteReservation(id);
+                    }
+                });
+                container._delegateListenerAdded = true;
+            }
+        }
+
         // ---------- Render ----------
         function renderUI() {
             const totalCash = appState.totalCash;
@@ -1446,6 +1673,24 @@
             } else {
                 totalCashEl.style.color = '#10b981';
                 totalCashEl.innerText = formatEuro(totalCash);
+            }
+
+            // Reservations info in cash overview
+            const reservedRemaining = getReservedRemaining();
+            const reservationInfoEl = document.getElementById('reservationInfo');
+            if (reservedRemaining > 0) {
+                reservationInfoEl.classList.remove('hidden');
+                document.getElementById('reservedAmountDisplay').innerText = formatEuro(reservedRemaining);
+                const available = getAvailableAfterReservations();
+                const availableEl = document.getElementById('availableAfterReservationsDisplay');
+                if (available < 0) {
+                    availableEl.style.color = '#ef4444';
+                } else {
+                    availableEl.style.color = '#cbd5e1';
+                }
+                availableEl.innerText = formatEuro(Math.abs(available));
+            } else {
+                reservationInfoEl.classList.add('hidden');
             }
 
             const daysRemaining = getDaysRemainingInMonth();
@@ -1462,9 +1707,13 @@
             const todayRemaining = Math.max(0, dailyLimit - todaySpent);
             document.getElementById('todayRemainingDisplay').innerText = formatEuro(todayRemaining);
 
+            // Reservations sum display
+            document.getElementById('reservedSumDisplay').innerText = formatEuro(reservedRemaining);
+
             renderTrafficLight(todaySpent, dailyLimit, totalCash);
             renderCategoryBreakdown();
             renderTransactions();
+            renderReservations();
             updateBackupBanner();
         }
 
