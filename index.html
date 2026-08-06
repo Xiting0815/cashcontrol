@@ -118,7 +118,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
-                        <input type="number" id="expenseAmount" step="0.01" min="0.01" placeholder="0,00" required
+                        <input type="text" id="expenseAmount" inputmode="decimal" placeholder="0,00" required
                             class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
                     </div>
                     <div>
@@ -176,7 +176,7 @@
             <form onsubmit="handleAddIncome(event)" class="space-y-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
-                    <input type="number" id="incomeAmount" step="0.01" min="0.01" placeholder="50.00" required
+                    <input type="text" id="incomeAmount" inputmode="decimal" placeholder="50.00" required
                         class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
@@ -247,10 +247,44 @@
             { id: 'Sonstiges', label: 'Sonstiges', icon: '📦', color: 'bg-slate-500' }
         ];
 
+        // ---------- A1: Local Date Helpers ----------
+        function toLocalDateKey(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const date = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${date}`;
+        }
+
+        function toLocalMonthKey(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        function txLocalDateKey(tx) {
+            return toLocalDateKey(new Date(tx.date));
+        }
+
+        function txLocalMonthKey(tx) {
+            return toLocalMonthKey(new Date(tx.date));
+        }
+
+        // ---------- A2: Recompute Total Cash ----------
+        function recomputeTotalCash() {
+            const incomeSum = appState.transactions
+                .filter(tx => tx.type === 'income')
+                .reduce((sum, tx) => sum + tx.amount, 0);
+            const expenseSum = appState.transactions
+                .filter(tx => tx.type === 'expense')
+                .reduce((sum, tx) => sum + tx.amount, 0);
+            appState.totalCash = Math.round((incomeSum - expenseSum) * 100) / 100;
+        }
+
         // ---------- Init ----------
         window.addEventListener('DOMContentLoaded', () => {
             loadFromStorage();
             migrateLegacyStorage();
+            migrateState();
             populateMonthSelect();
             renderUI();
             registerServiceWorker();
@@ -281,11 +315,39 @@
                     const parsed = JSON.parse(saved);
                     if (parsed && Array.isArray(parsed.transactions)) {
                         appState = parsed;
+                        recomputeTotalCash();
                     }
                 } catch (e) {
                     console.error('Fehler beim Laden gespeicherter Daten:', e);
                 }
             }
+        }
+
+        // ---------- A4: Migration ----------
+        function migrateState() {
+            if (!appState.schemaVersion) appState.schemaVersion = 3;
+            if (!appState.budgets) {
+                appState.budgets = {};
+                CATEGORIES.forEach(c => {
+                    appState.budgets[c.id] = 0;
+                });
+            }
+            if (!appState.settings) {
+                appState.settings = {
+                    lastBackupAt: null,
+                    backupReminderDays: 14
+                };
+            }
+            if (!appState.transactions) appState.transactions = [];
+
+            // Vergib fehlende IDs
+            appState.transactions.forEach((tx, i) => {
+                if (!tx.id) {
+                    tx.id = `migrated-${i}-${Date.now()}`;
+                }
+            });
+
+            recomputeTotalCash();
         }
 
         // Übernimmt Daten aus der alten Vorversion (Schlüssel ohne _v2), falls vorhanden
@@ -310,9 +372,70 @@
             }
         }
 
+        // ---------- A7: Undo ----------
+        function saveUndoSnapshot() {
+            const snapshot = {
+                savedAt: new Date().toISOString(),
+                state: JSON.parse(JSON.stringify(appState))
+            };
+            try {
+                localStorage.setItem('cashControl_undo_v1', JSON.stringify(snapshot));
+            } catch (e) {
+                console.warn('Undo-Snapshot konnte nicht gespeichert werden:', e);
+            }
+        }
+
+        function undoLastDestructive() {
+            const snapStr = localStorage.getItem('cashControl_undo_v1');
+            if (!snapStr) {
+                showToast('Kein Undo-Snapshot vorhanden.');
+                return;
+            }
+
+            try {
+                const snap = JSON.parse(snapStr);
+                const savedTime = new Date(snap.savedAt).getTime();
+                const now = Date.now();
+                const maxAge = 24 * 60 * 60 * 1000; // 24 Stunden
+
+                if (now - savedTime > maxAge) {
+                    localStorage.removeItem('cashControl_undo_v1');
+                    showToast('Undo-Snapshot ist älter als 24 Stunden und wurde gelöscht.');
+                    return;
+                }
+
+                appState = snap.state;
+                saveToStorage();
+                localStorage.removeItem('cashControl_undo_v1');
+                populateMonthSelect();
+                renderUI();
+                showToast('Aktion rückgängig gemacht.');
+            } catch (e) {
+                console.error('Undo-Fehler:', e);
+                showToast('Undo fehlgeschlagen.');
+            }
+        }
+
+        function hasUndoSnapshot() {
+            const snapStr = localStorage.getItem('cashControl_undo_v1');
+            if (!snapStr) return false;
+
+            try {
+                const snap = JSON.parse(snapStr);
+                const savedTime = new Date(snap.savedAt).getTime();
+                const now = Date.now();
+                const maxAge = 24 * 60 * 60 * 1000;
+                return (now - savedTime <= maxAge);
+            } catch (e) {
+                return false;
+            }
+        }
+
         function resetAllData() {
             if (confirm('Möchtest du wirklich alle Bargeld-Daten zurücksetzen? Dies kann nicht rückgängig gemacht werden.')) {
-                appState = { totalCash: 0, transactions: [] };
+                saveUndoSnapshot();
+                appState = { totalCash: 0, transactions: [], schemaVersion: 3, budgets: {}, settings: { lastBackupAt: null, backupReminderDays: 14 } };
+                CATEGORIES.forEach(c => { appState.budgets[c.id] = 0; });
                 saveToStorage();
                 populateMonthSelect();
                 renderUI();
@@ -322,12 +445,47 @@
 
         // ---------- Backup Export / Import ----------
         function exportBackup() {
-            const blob = new Blob([JSON.stringify(appState, null, 2)], { type: 'application/json' });
+            const backup = {
+                app: 'cashcontrol',
+                schemaVersion: 3,
+                exportedAt: new Date().toISOString(),
+                data: appState
+            };
+
+            const backupJson = JSON.stringify(backup, null, 2);
+            const blob = new Blob([backupJson], { type: 'application/json' });
+
+            // Dateiname mit lokaler Zeit YYYY-MM-DD-HHMM
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const fileName = `cashcontrol-backup-${year}-${month}-${day}-${hours}${minutes}.json`;
+
+            // Versuche Share API wenn verfügbar
+            const file = new File([blob], fileName, { type: 'application/json' });
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file] }).catch(() => {
+                    // Fehler: Fallback auf Download
+                    downloadBackupFile(blob, fileName);
+                });
+            } else {
+                // Share nicht verfügbar: Download
+                downloadBackupFile(blob, fileName);
+            }
+
+            // lastBackupAt setzen
+            appState.settings.lastBackupAt = new Date().toISOString();
+            saveToStorage();
+        }
+
+        function downloadBackupFile(blob, fileName) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            const dateStr = new Date().toISOString().split('T')[0];
             a.href = url;
-            a.download = `cashcontrol-backup-${dateStr}.json`;
+            a.download = fileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -335,25 +493,118 @@
             showToast('Backup exportiert.');
         }
 
-        function importBackup(event) {
+        // ---------- A8: Backup-Erinnerung ----------
+        function shouldRemindBackup() {
+            if (appState.transactions.length < 5) return false;
+
+            const lastBackupAt = appState.settings?.lastBackupAt;
+            if (!lastBackupAt) return true;
+
+            const backupReminderDays = appState.settings?.backupReminderDays || 14;
+            const lastBackupTime = new Date(lastBackupAt).getTime();
+            const now = Date.now();
+            const daysElapsed = (now - lastBackupTime) / (1000 * 60 * 60 * 24);
+
+            return daysElapsed > backupReminderDays;
+        }
+
+        // ---------- A6: Backup-Validierung ----------
+        function validateBackup(obj) {
+            if (!obj) return { ok: false, data: null, error: 'Datei ist leer', skipped: 0 };
+
+            let transactions = [];
+            let skipped = 0;
+
+            // Akzeptiere sowohl neue Hülle als auch v2-Rohformat
+            if (obj.app === 'cashcontrol' && obj.data && Array.isArray(obj.data.transactions)) {
+                transactions = obj.data.transactions;
+            } else if (Array.isArray(obj.transactions)) {
+                transactions = obj.transactions;
+            } else {
+                return { ok: false, data: null, error: 'Keine Transaktionen gefunden', skipped: 0 };
+            }
+
+            const validTransactions = [];
+            transactions.forEach(tx => {
+                // Prüfe type
+                if (tx.type !== 'income' && tx.type !== 'expense') {
+                    skipped++;
+                    return;
+                }
+                // Prüfe amount
+                const amount = parseFloat(tx.amount);
+                if (!isFinite(amount) || amount <= 0) {
+                    skipped++;
+                    return;
+                }
+                // Prüfe date
+                const date = new Date(tx.date);
+                if (isNaN(date.getTime())) {
+                    skipped++;
+                    return;
+                }
+                // Alles OK
+                validTransactions.push(tx);
+            });
+
+            return {
+                ok: true,
+                data: validTransactions,
+                error: null,
+                skipped: skipped
+            };
+        }
+
+        // ---------- A6: Import mit Modi ----------
+        function importBackup(event, mode = 'replace') {
             const file = event.target.files[0];
             if (!file) return;
+
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const parsed = JSON.parse(e.target.result);
-                    if (!parsed || !Array.isArray(parsed.transactions)) {
-                        throw new Error('Ungültiges Format');
+                    const validation = validateBackup(parsed);
+
+                    if (!validation.ok) {
+                        showToast('Fehler: ' + validation.error);
+                        return;
                     }
-                    if (confirm('Import überschreibt die aktuellen Daten. Fortfahren?')) {
-                        appState = parsed;
-                        saveToStorage();
-                        populateMonthSelect();
-                        renderUI();
-                        showToast('Backup importiert.');
+
+                    if (mode === 'replace') {
+                        if (!confirm('Import überschreibt die aktuellen Daten. Fortfahren?')) return;
+                        appState.transactions = validation.data;
+                    } else if (mode === 'merge') {
+                        // Zusammenführen: bestehende + importierte, Duplikate über ID entfernen
+                        const merged = [...appState.transactions, ...validation.data];
+                        const seen = new Set();
+                        appState.transactions = merged.filter(tx => {
+                            if (seen.has(tx.id)) return false;
+                            seen.add(tx.id);
+                            return true;
+                        });
+                        // Absteigend nach Datum sortieren
+                        appState.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
                     }
+
+                    // Undo-Snapshot speichern vor Import
+                    saveUndoSnapshot();
+
+                    migrateState();
+                    recomputeTotalCash();
+                    saveToStorage();
+                    populateMonthSelect();
+                    renderUI();
+
+                    let dupes = 0;
+                    if (mode === 'merge') {
+                        dupes = Math.max(0, (parsed.data?.transactions?.length || parsed.transactions?.length || 0) - validation.data.length + validation.skipped);
+                    }
+
+                    const msg = `${validation.data.length} übernommen${validation.skipped > 0 ? ', ' + validation.skipped + ' übersprungen' : ''}${dupes > 0 ? ', ' + dupes + ' Duplikate' : ''}`;
+                    showToast(msg);
                 } catch (err) {
-                    alert('Die Datei konnte nicht gelesen werden: ' + err.message);
+                    showToast('Fehler beim Lesen der Datei: ' + err.message);
                 }
             };
             reader.readAsText(file);
@@ -361,6 +612,17 @@
         }
 
         // ---------- Helpers ----------
+        // ---------- A9: Amount Parsing ----------
+        function parseAmount(str) {
+            if (typeof str !== 'string') return NaN;
+            // Komma zu Punkt, Leerzeichen entfernen
+            const normalized = str.replace(/,/g, '.').replace(/\s/g, '');
+            const num = parseFloat(normalized);
+            if (!isFinite(num) || num <= 0) return NaN;
+            // Auf 2 Nachkommastellen runden
+            return Math.round(num * 100) / 100;
+        }
+
         function formatEuro(amount) {
             return (amount || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
         }
@@ -402,15 +664,20 @@
         }
 
         function getTodaySpent() {
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayKey = toLocalDateKey(new Date());
             return appState.transactions
-                .filter(tx => tx.type === 'expense' && tx.date.startsWith(todayStr))
+                .filter(tx => tx.type === 'expense' && txLocalDateKey(tx) === todayKey)
                 .reduce((sum, tx) => sum + tx.amount, 0);
         }
 
+        function getDailyLimit() {
+            const daysRemaining = getDaysRemainingInMonth();
+            return (appState.totalCash + getTodaySpent()) / Math.max(1, daysRemaining);
+        }
+
         function getAvailableMonths() {
-            const months = new Set(appState.transactions.map(tx => tx.date.substring(0, 7)));
-            months.add(new Date().toISOString().substring(0, 7));
+            const months = new Set(appState.transactions.map(tx => txLocalMonthKey(tx)));
+            months.add(toLocalMonthKey(new Date()));
             return Array.from(months).sort().reverse();
         }
 
@@ -433,7 +700,7 @@
             CATEGORIES.forEach(c => categorySums[c.id] = 0);
 
             appState.transactions
-                .filter(tx => tx.type === 'expense' && tx.date.startsWith(monthStr))
+                .filter(tx => tx.type === 'expense' && txLocalMonthKey(tx) === monthStr)
                 .forEach(tx => {
                     if (categorySums[tx.category] !== undefined) {
                         categorySums[tx.category] += tx.amount;
@@ -448,11 +715,16 @@
         // ---------- Expense Flow ----------
         function handleAddExpense(event) {
             event.preventDefault();
-            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const amountStr = document.getElementById('expenseAmount').value;
+            const amount = parseAmount(amountStr);
             const category = document.getElementById('expenseCategory').value;
             const note = document.getElementById('expenseNote').value.trim();
 
-            if (!amount || amount <= 0) return;
+            if (isNaN(amount)) {
+                showToast('Bitte einen gültigen Betrag eingeben.');
+                document.getElementById('expenseAmount').focus();
+                return;
+            }
 
             if (amount > appState.totalCash) {
                 pendingExpense = { amount, category, note, overBudget: 'cash' };
@@ -464,10 +736,9 @@
             }
 
             const todaySpent = getTodaySpent();
-            const daysRemaining = getDaysRemainingInMonth();
-            const targetDailyLimit = daysRemaining > 0 ? (appState.totalCash / daysRemaining) : 0;
+            const limit = getDailyLimit();
 
-            if (targetDailyLimit > 0 && (todaySpent + amount) > targetDailyLimit) {
+            if (limit > 0 && (todaySpent + amount) > limit + 0.005) {
                 pendingExpense = { amount, category, note, overBudget: 'daily' };
                 document.getElementById('warningTitle').innerText = 'Achtung: Tageslimit erreicht!';
                 document.getElementById('warningText').innerText =
@@ -489,7 +760,7 @@
                 date: new Date().toISOString()
             };
             appState.transactions.unshift(tx);
-            appState.totalCash = Math.max(0, appState.totalCash - amount);
+            recomputeTotalCash();
             saveToStorage();
             document.getElementById('expenseForm').reset();
             populateMonthSelect();
@@ -513,9 +784,15 @@
         // ---------- Income Flow ----------
         function handleAddIncome(event) {
             event.preventDefault();
-            const amount = parseFloat(document.getElementById('incomeAmount').value);
+            const amountStr = document.getElementById('incomeAmount').value;
+            const amount = parseAmount(amountStr);
             const source = document.getElementById('incomeSource').value;
-            if (!amount || amount <= 0) return;
+
+            if (isNaN(amount)) {
+                showToast('Bitte einen gültigen Betrag eingeben.');
+                document.getElementById('incomeAmount').focus();
+                return;
+            }
 
             const tx = {
                 id: generateId(),
@@ -525,7 +802,7 @@
                 date: new Date().toISOString()
             };
             appState.transactions.unshift(tx);
-            appState.totalCash += amount;
+            recomputeTotalCash();
             saveToStorage();
             event.target.reset();
             closeModal('incomeModal');
@@ -540,12 +817,8 @@
             if (!tx) return;
             if (!confirm('Diese Buchung wirklich löschen?')) return;
 
-            if (tx.type === 'expense') {
-                appState.totalCash += tx.amount;
-            } else {
-                appState.totalCash = Math.max(0, appState.totalCash - tx.amount);
-            }
             appState.transactions = appState.transactions.filter(t => t.id !== id);
+            recomputeTotalCash();
             saveToStorage();
             populateMonthSelect();
             renderUI();
@@ -560,14 +833,13 @@
             document.getElementById('daysLeftDisplay').innerText = daysRemaining;
 
             const todaySpent = getTodaySpent();
-            const availableCash = Math.max(0, appState.totalCash);
-            const targetDailyLimit = daysRemaining > 0 ? (availableCash / daysRemaining) : 0;
+            const dailyLimit = getDailyLimit();
 
-            document.getElementById('suggestedDailyDisplay').innerText = formatEuro(targetDailyLimit);
-            document.getElementById('targetDailyDisplay').innerText = formatEuro(targetDailyLimit);
+            document.getElementById('suggestedDailyDisplay').innerText = formatEuro(dailyLimit);
+            document.getElementById('targetDailyDisplay').innerText = formatEuro(dailyLimit);
             document.getElementById('todaySpentDisplay').innerText = formatEuro(todaySpent);
 
-            renderTrafficLight(todaySpent, targetDailyLimit);
+            renderTrafficLight(todaySpent, dailyLimit);
             renderCategoryBreakdown();
             renderTransactions();
         }
@@ -660,28 +932,77 @@
             container.innerHTML = recent.map(tx => {
                 const isExpense = tx.type === 'expense';
                 const cat = CATEGORIES.find(c => c.id === tx.category);
-                const icon = isExpense ? (cat ? cat.icon : '📦') : '💶';
-                const label = isExpense ? (cat ? cat.label : tx.category) : (tx.source || 'Einnahme');
+                const icon = escapeHtml(isExpense ? (cat ? cat.icon : '📦') : '💶');
+                const label = escapeHtml(isExpense ? (cat ? cat.label : (tx.category || 'Unbekannt')) : (tx.source || 'Einnahme'));
                 const dateLabel = new Date(tx.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const sign = isExpense ? '−' : '+';
                 const colorClass = isExpense ? 'text-red-400' : 'text-emerald-400';
+                const noteHtml = tx.note ? ' · ' + escapeHtml(tx.note) : '';
 
                 return `
                     <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-3 py-2.5">
                         <div class="flex items-center gap-2.5 min-w-0">
                             <span class="text-lg leading-none">${icon}</span>
                             <div class="min-w-0">
-                                <div class="text-xs font-medium text-slate-200 truncate">${label}${tx.note ? ' · ' + escapeHtml(tx.note) : ''}</div>
+                                <div class="text-xs font-medium text-slate-200 truncate">${label}${noteHtml}</div>
                                 <div class="text-[10px] text-slate-500">${dateLabel}</div>
                             </div>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
-                            <button onclick="deleteTransaction('${tx.id}')" class="text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen">✕</button>
+                            <button class="deleteBtn text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeHtml(tx.id)}">✕</button>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            // Delegierter Listener einmalig registrieren (wenn nicht schon vorhanden)
+            if (!container._delegateListenerAdded) {
+                container.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('deleteBtn')) {
+                        const id = e.target.dataset.id;
+                        deleteTransaction(id);
+                    }
+                });
+                container._delegateListenerAdded = true;
+            }
+        }
+
+        // ---------- A11: Category Budgets (Logik) ----------
+        function setBudget(catId, value) {
+            if (!appState.budgets) appState.budgets = {};
+            appState.budgets[catId] = parseFloat(value) || 0;
+            saveToStorage();
+            renderUI();
+        }
+
+        function getBudgetUsage(catId, monthKey) {
+            const categoryExpenses = appState.transactions
+                .filter(tx => tx.type === 'expense' && tx.category === catId && txLocalMonthKey(tx) === monthKey)
+                .reduce((sum, tx) => sum + tx.amount, 0);
+
+            const budget = appState.budgets?.[catId] || 0;
+            const isBudgetSet = budget > 0;
+
+            let spent = categoryExpenses;
+            let budgetAmount = budget;
+            let pct = 0;
+            let over = false;
+
+            if (isBudgetSet) {
+                // Gegen das gesetzte Budget
+                pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+                over = spent > budget;
+            } else {
+                // Gegen die Monatssumme
+                const monthTotal = appState.transactions
+                    .filter(tx => tx.type === 'expense' && txLocalMonthKey(tx) === monthKey)
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+                pct = monthTotal > 0 ? Math.round((spent / monthTotal) * 100) : 0;
+                budgetAmount = monthTotal;
+            }
+
+            return { spent, budget: budgetAmount, pct, over };
         }
 
         function escapeHtml(str) {
