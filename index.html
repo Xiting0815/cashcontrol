@@ -1526,8 +1526,10 @@
                         const dd = String(date.getDate()).padStart(2, '0');
                         const mm = String(date.getMonth() + 1).padStart(2, '0');
                         const dateStr = `${dd}.${mm}.`;
-                        const noteStr = item.note ? ` ${item.note}` : '';
-                        text += `   ${dateStr} ${noteStr} — ${formatEuro(item.amount)}\n`;
+                        // Ohne Notiz nur Datum und Betrag – sonst bliebe ein Gedankenstrich ohne Bezug stehen
+                        text += item.note
+                            ? `   ${dateStr}  ${item.note} — ${formatEuro(item.amount)}\n`
+                            : `   ${dateStr}  ${formatEuro(item.amount)}\n`;
                     });
                     text += '\n';
                 });
@@ -1543,7 +1545,7 @@
                     const dd = String(date.getDate()).padStart(2, '0');
                     const mm = String(date.getMonth() + 1).padStart(2, '0');
                     const dateStr = `${dd}.${mm}.`;
-                    text += `   ${dateStr}  ${item.source} — ${formatEuro(item.amount)}\n`;
+                    text += `   ${dateStr}  ${item.source || 'Einnahme'} — ${formatEuro(item.amount)}\n`;
                 });
             }
 
