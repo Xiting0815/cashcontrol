@@ -17,16 +17,18 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0fdf4',
-                            500: '#22c55e',
-                            600: '#16a34a',
-                            900: '#14532d',
+        if (typeof tailwind !== 'undefined') {
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            brand: {
+                                50: '#f0fdf4',
+                                500: '#22c55e',
+                                600: '#16a34a',
+                                900: '#14532d',
+                            }
                         }
                     }
                 }
@@ -34,52 +36,416 @@
         }
     </script>
     <style>
-        .transition-all-200 { transition: all 0.2s ease-in-out; }
+        /* B10: Tailwind-Absturz abfedern – Minimalgerüst */
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            padding-bottom: env(safe-area-inset-bottom);
+            line-height: 1.5;
+        }
+
+        header {
+            background-color: #0f172a;
+            border-bottom: 1px solid #1e293b;
+            padding-top: env(safe-area-inset-top);
+            position: sticky;
+            top: 0;
+            z-index: 30;
+        }
+
+        main {
+            max-width: 448px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        section {
+            margin-bottom: 1.25rem;
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            padding: 1.25rem;
+        }
+
+        h1, h2, h3 {
+            font-weight: 700;
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 1.125rem;
+        }
+
+        h2 {
+            font-size: 1rem;
+        }
+
+        label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #94a3b8;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 0.625rem 0.75rem;
+            color: #f1f5f9;
+            font-size: 0.875rem;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+        }
+
+        button {
+            font-size: 0.875rem;
+            padding: 0.625rem 1rem;
+            border: none;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+        }
+
+        button:active {
+            transform: scale(0.99);
+        }
+
+        .bg-emerald-600 {
+            background-color: #059669;
+        }
+
+        .bg-emerald-600:hover {
+            background-color: #10b981;
+        }
+
+        .bg-slate-700 {
+            background-color: #334155;
+        }
+
+        .bg-slate-700:hover {
+            background-color: #475569;
+        }
+
+        .text-white {
+            color: #ffffff;
+        }
+
+        .text-slate-200 {
+            color: #e2e8f0;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* B6: Modal CSS (statt hidden+flex im class) */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal.modal--open {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            padding: 1.25rem;
+            width: 100%;
+            max-width: 28rem;
+        }
+
+        .modal-header {
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #ffffff;
+        }
+
+        .modal-divider {
+            height: 1px;
+            background-color: #334155;
+            margin: 0.75rem 0;
+        }
+
+        /* B9: Backup-Banner */
+        .backup-banner {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .backup-banner-text {
+            color: #cbd5e1;
+            flex: 1;
+        }
+
+        .backup-banner-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .backup-banner button {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        /* B4: FAB */
+        .fab {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: #059669;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            border: none;
+            cursor: pointer;
+            z-index: 40;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .fab:hover {
+            background-color: #10b981;
+        }
+
+        /* B4: Chip-Reihe */
+        .chip-row {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            scroll-behavior: smooth;
+        }
+
+        .chip {
+            flex-shrink: 0;
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 1.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease-in-out;
+            color: #cbd5e1;
+        }
+
+        .chip:hover {
+            border-color: #059669;
+        }
+
+        .chip.chip--active {
+            background-color: #059669;
+            border-color: #10b981;
+            color: #ffffff;
+        }
+
+        /* Filter Chips */
+        .filter-chips {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-chip {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 1.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #cbd5e1;
+        }
+
+        .filter-chip:hover {
+            border-color: #059669;
+        }
+
+        .filter-chip.active {
+            background-color: #059669;
+            border-color: #10b981;
+            color: white;
+        }
+
+        /* B8: Kategorie-Gruppierung */
+        .tx-group-header {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-top: 0.75rem;
+            margin-bottom: 0.5rem;
+            padding-left: 0.75rem;
+        }
+
+        /* Utility */
+        .transition-all-200 {
+            transition: all 0.2s ease-in-out;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Menu Button */
+        .menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e1;
+        }
+
+        .menu-btn:hover {
+            color: #10b981;
+        }
+
+        /* Settings Sheet */
+        .settings-sheet-item {
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+            text-align: left;
+            background: none;
+            border: none;
+            width: 100%;
+            color: #cbd5e1;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+        }
+
+        .settings-sheet-item:hover {
+            background-color: #334155;
+        }
+
+        .settings-sheet-item.danger {
+            color: #ef4444;
+        }
+
+        .settings-sheet-item.danger:hover {
+            background-color: #7f1d1d;
+        }
+
+        /* More button */
+        .more-btn {
+            width: 100%;
+            background-color: #334155;
+            color: #cbd5e1;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+
+        .more-btn:hover {
+            background-color: #475569;
+        }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen pb-12 font-sans antialiased selection:bg-brand-500 selection:text-white">
+<body>
 
-    <!-- Top Bar Header -->
+    <!-- Top Bar Header (B5: Safe-Area-Padding) -->
     <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
         <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
             <div class="flex items-center space-x-2">
                 <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
                 <h1 class="font-bold text-lg tracking-wide text-slate-100">CashControl</h1>
             </div>
-            <div class="flex items-center gap-3">
-                <button onclick="exportBackup()" title="Backup exportieren" class="text-xs text-slate-500 hover:text-emerald-400 transition-colors">
-                    Export
-                </button>
-                <label class="text-xs text-slate-500 hover:text-emerald-400 transition-colors cursor-pointer">
-                    Import
-                    <input type="file" accept="application/json" onchange="importBackup(event)" class="hidden">
-                </label>
-                <button onclick="resetAllData()" class="text-xs text-slate-500 hover:text-red-400 transition-colors">
-                    Reset
-                </button>
-            </div>
+            <!-- B1: Menu Button -->
+            <button class="menu-btn" onclick="openSettingsSheet()" aria-label="Menü">⋯</button>
         </div>
     </header>
 
-    <main class="max-w-md mx-auto px-4 pt-4 space-y-5">
+    <main>
 
-        <!-- Cash Overview Card -->
-        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+        <!-- B9: Backup-Banner (wenn shouldRemindBackup true) -->
+        <div id="backupBanner" class="backup-banner hidden">
+            <span class="backup-banner-text" id="backupBannerText"></span>
+            <div class="backup-banner-actions">
+                <button onclick="exportBackupAndClose()" class="bg-emerald-600 hover:bg-emerald-500 text-white">Sichern</button>
+                <button onclick="dismissBackupBanner()" class="bg-slate-700 hover:bg-slate-600 text-slate-200">✕</button>
+            </div>
+        </div>
+
+        <!-- B2: Cash Overview Card (larger, prominent) -->
+        <section class="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/60 rounded-2xl p-5 shadow-xl relative overflow-hidden">
             <div class="flex justify-between items-start mb-2">
                 <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Aktueller Bargeldbestand</span>
                 <button onclick="openModal('incomeModal')" class="text-xs bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-medium transition-all">
                     + Geld erhalten
                 </button>
             </div>
-            <div class="text-3xl font-extrabold text-white tracking-tight" id="totalCashDisplay">0,00 €</div>
+            <div class="text-4xl font-extrabold tracking-tight mb-4" id="totalCashDisplay" style="color: #10b981;">0,00 €</div>
 
-            <div class="mt-4 pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-400">
-                <span>Verbleibende Tage im Monat: <strong class="text-slate-200" id="daysLeftDisplay">--</strong></span>
-                <span>Empfohlenes Tageslimit: <strong class="text-emerald-400" id="suggestedDailyDisplay">0,00 €</strong></span>
+            <div class="pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-400">
+                <span>Verbleibende Tage: <strong class="text-slate-200" id="daysLeftDisplay">--</strong></span>
+                <span>Tageslimit: <strong class="text-emerald-400" id="suggestedDailyDisplay">0,00 €</strong></span>
             </div>
         </section>
 
-        <!-- Daily Status / Traffic Light Indicator -->
+        <!-- B3: Daily Status / Traffic Light Indicator -->
         <section id="statusCard" class="border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center space-x-2">
@@ -87,51 +453,45 @@
                     <h2 class="font-bold text-base text-slate-100">Tagesstatus heute</h2>
                 </div>
                 <span id="statusBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Alles im grünen Bereich
+                    Im grünen Bereich
                 </span>
             </div>
 
-            <!-- Progress Bar -->
+            <!-- Progress Bar with remaining amount -->
             <div class="space-y-1.5">
                 <div class="flex justify-between text-xs font-medium">
                     <span class="text-slate-400">Ausgegeben: <span id="todaySpentDisplay" class="text-slate-200 font-bold">0,00 €</span></span>
-                    <span class="text-slate-400">Ziel-Max: <span id="targetDailyDisplay" class="text-slate-200">0,00 €</span></span>
+                    <span class="text-slate-400">Ziel: <span id="targetDailyDisplay" class="text-slate-200">0,00 €</span></span>
                 </div>
                 <div class="w-full bg-slate-700/60 rounded-full h-3 overflow-hidden p-0.5">
                     <div id="dailyProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
                 </div>
+                <!-- B3: Remaining for today in Euro -->
+                <div class="text-xs text-slate-400 text-right">
+                    Verbleibend heute: <span id="todayRemainingDisplay" class="text-emerald-400 font-semibold">0,00 €</span>
+                </div>
             </div>
 
-            <!-- Impulsschutz Warning Text -->
+            <!-- Status Message -->
             <p id="statusMessage" class="text-xs text-slate-400 mt-3 leading-relaxed">
                 Du bist heute gut im Rahmen. Spontane Zusatzkäufe vermeiden.
             </p>
         </section>
 
-        <!-- Quick Expense Form -->
+        <!-- B4: Quick Expense Form (moved up, before categories) -->
         <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
             <h2 class="font-bold text-base text-slate-100 mb-3 flex items-center gap-2">
                 <span>⚡</span> Ausgabe eintragen
             </h2>
 
+            <!-- B4: Category Chips (horizontal scroll) -->
+            <div class="chip-row" id="categoryChips"></div>
+
             <form id="expenseForm" onsubmit="handleAddExpense(event)" class="space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
-                        <input type="text" id="expenseAmount" inputmode="decimal" placeholder="0,00" required
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">Kategorie</label>
-                        <select id="expenseCategory" required
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
-                            <option value="Haushalt/Essen">🛒 Essen / Haushalt</option>
-                            <option value="Tabak">🚬 Tabak</option>
-                            <option value="Reptilien">🦎 Reptilien</option>
-                            <option value="Privatkäufe">🛍️ Privatkäufe</option>
-                            <option value="Sonstiges">📦 Sonstiges</option>
-                        </select>
-                    </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
+                    <input type="text" id="expenseAmount" inputmode="decimal" placeholder="0,00" required
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
                 </div>
 
                 <div>
@@ -156,23 +516,40 @@
             <div id="categoryBreakdown" class="space-y-3"></div>
         </section>
 
-        <!-- Recent Transactions -->
+        <!-- Recent Transactions with Filter Chips -->
         <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
             <div class="flex justify-between items-center mb-3">
                 <h2 class="font-bold text-base text-slate-100">Letzte Bewegungen</h2>
                 <span class="text-xs text-slate-500" id="txCount">0 Einträge</span>
             </div>
-            <div id="transactionList" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+
+            <!-- B8: Filter Chips -->
+            <div class="filter-chips">
+                <button class="filter-chip active" onclick="setTxFilter('all')">Alle</button>
+                <button class="filter-chip" onclick="setTxFilter('expense')">Ausgaben</button>
+                <button class="filter-chip" onclick="setTxFilter('income')">Einnahmen</button>
+            </div>
+
+            <!-- Transaction List -->
+            <div id="transactionList" class="space-y-2 max-h-96 overflow-y-auto pr-1">
                 <p class="text-xs text-slate-500 text-center py-4">Noch keine Buchungen vorhanden.</p>
             </div>
+
+            <!-- B8: "More" button -->
+            <button id="moreBtn" class="more-btn hidden" onclick="loadMoreTransactions()">Mehr anzeigen</button>
         </section>
 
     </main>
 
-    <!-- Modal: Add Cash / Income -->
-    <div id="incomeModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
-            <h3 class="font-bold text-lg text-white">Bargeld erhalten</h3>
+    <!-- B4: FAB (Floating Action Button) -->
+    <button class="fab" onclick="scrollToExpenseForm()" aria-label="Ausgabe eintragen" title="Ausgabe eintragen">
+        ⚡
+    </button>
+
+    <!-- Modal: Add Cash / Income (B6: aria + keyboard) -->
+    <div id="incomeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="incomeModalTitle">
+        <div class="modal-content">
+            <h3 class="modal-header" id="incomeModalTitle">Bargeld erhalten</h3>
             <form onsubmit="handleAddIncome(event)" class="space-y-3">
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
@@ -201,18 +578,16 @@
         </div>
     </div>
 
-    <!-- Modal: Warning Alert (Impulsschutz) -->
-    <div id="warningModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-800 border border-amber-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center space-y-4">
-            <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30">
+    <!-- Modal: Warning Alert (B6: aria + keyboard) -->
+    <div id="warningModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="warningModalTitle">
+        <div class="modal-content">
+            <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30 mb-4">
                 ⚠️
             </div>
-            <div>
-                <h3 class="font-bold text-lg text-white mb-1" id="warningTitle">Achtung: Tageslimit erreicht!</h3>
-                <p class="text-xs text-slate-300 leading-relaxed" id="warningText">
-                    Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?
-                </p>
-            </div>
+            <h3 class="modal-header text-center" id="warningModalTitle">Achtung: Tageslimit erreicht!</h3>
+            <p class="text-xs text-slate-300 leading-relaxed mb-4 text-center" id="warningText">
+                Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?
+            </p>
             <div class="flex gap-2 pt-2">
                 <button onclick="cancelPendingExpense()"
                     class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
@@ -226,6 +601,38 @@
         </div>
     </div>
 
+    <!-- B1: Settings Sheet Modal (B6: aria + keyboard) -->
+    <div id="settingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+        <div class="modal-content">
+            <h3 class="modal-header" id="settingsModalTitle">Einstellungen</h3>
+            <div id="settingsSheetContent" class="space-y-1">
+                <!-- Items rendered dynamically by renderSettingsSheet() -->
+            </div>
+        </div>
+    </div>
+
+    <!-- B7: Budget Modal (B6: aria + keyboard) -->
+    <div id="budgetModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle">
+        <div class="modal-content">
+            <h3 class="modal-header" id="budgetModalTitle">Kategorie-Budgets</h3>
+            <form id="budgetForm" onsubmit="saveBudgets(event)" class="space-y-3">
+                <div id="budgetInputs" class="space-y-3">
+                    <!-- Inputs rendered dynamically -->
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeModal('budgetModal')"
+                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                        Abbrechen
+                    </button>
+                    <button type="submit"
+                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                        Speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-4 py-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 z-[60]"></div>
 
@@ -234,10 +641,16 @@
 
         let appState = {
             totalCash: 0,
-            transactions: [] // { id, type: 'income'|'expense', amount, category|source, note, date (ISO) }
+            transactions: [],
+            schemaVersion: 3,
+            budgets: {},
+            settings: { lastBackupAt: null, backupReminderDays: 14 }
         };
 
         let pendingExpense = null;
+        let selectedCategory = 'Haushalt/Essen';
+        let transactionFilter = 'all';
+        let transactionDisplayCount = 30;
 
         const CATEGORIES = [
             { id: 'Haushalt/Essen', label: 'Essen / Haushalt', icon: '🛒', color: 'bg-blue-500' },
@@ -286,8 +699,11 @@
             migrateLegacyStorage();
             migrateState();
             populateMonthSelect();
+            renderCategoryChips();
             renderUI();
             registerServiceWorker();
+            setupModalKeyboard();
+            updateBackupBanner();
         });
 
         // ========== C4: Installation-Hinweis ==========
@@ -323,17 +739,14 @@
                     .then((registration) => {
                         let waitingWorker = registration.waiting;
 
-                        // Prüfe direkt beim Register auf einen wartenden Worker
                         if (waitingWorker) {
                             promptUserForUpdate(waitingWorker);
                         }
 
-                        // Höre auf neue installierte Worker
                         registration.addEventListener('updatefound', () => {
                             const newWorker = registration.installing;
                             newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // Ein neuer Worker ist installiert und es gibt bereits einen aktiven Controller
                                     promptUserForUpdate(newWorker);
                                 }
                             });
@@ -347,15 +760,12 @@
 
         function promptUserForUpdate(worker) {
             showToast('Neue Version verfügbar – App neu starten.');
-            // Speichere den wartenden Worker für applyUpdate()
             window._waitingWorker = worker;
         }
 
         function applyUpdate() {
             if (window._waitingWorker) {
-                // Sende SKIP_WAITING an den wartenden Worker
                 window._waitingWorker.postMessage('SKIP_WAITING');
-                // Auf controllerchange warten und neu laden
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
                     window.location.reload();
                 });
@@ -404,7 +814,6 @@
             }
             if (!appState.transactions) appState.transactions = [];
 
-            // Vergib fehlende IDs
             appState.transactions.forEach((tx, i) => {
                 if (!tx.id) {
                     tx.id = `migrated-${i}-${Date.now()}`;
@@ -414,7 +823,6 @@
             recomputeTotalCash();
         }
 
-        // Übernimmt Daten aus der alten Vorversion (Schlüssel ohne _v2), falls vorhanden
         function migrateLegacyStorage() {
             const legacy = localStorage.getItem('cashControl_state');
             const alreadyMigrated = localStorage.getItem('cashControl_migrated');
@@ -460,7 +868,7 @@
                 const snap = JSON.parse(snapStr);
                 const savedTime = new Date(snap.savedAt).getTime();
                 const now = Date.now();
-                const maxAge = 24 * 60 * 60 * 1000; // 24 Stunden
+                const maxAge = 24 * 60 * 60 * 1000;
 
                 if (now - savedTime > maxAge) {
                     localStorage.removeItem('cashControl_undo_v1');
@@ -472,7 +880,9 @@
                 saveToStorage();
                 localStorage.removeItem('cashControl_undo_v1');
                 populateMonthSelect();
+                renderCategoryChips();
                 renderUI();
+                closeModal('settingsModal');
                 showToast('Aktion rückgängig gemacht.');
             } catch (e) {
                 console.error('Undo-Fehler:', e);
@@ -498,11 +908,19 @@
         function resetAllData() {
             if (confirm('Möchtest du wirklich alle Bargeld-Daten zurücksetzen? Dies kann nicht rückgängig gemacht werden.')) {
                 saveUndoSnapshot();
-                appState = { totalCash: 0, transactions: [], schemaVersion: 3, budgets: {}, settings: { lastBackupAt: null, backupReminderDays: 14 } };
+                appState = {
+                    totalCash: 0,
+                    transactions: [],
+                    schemaVersion: 3,
+                    budgets: {},
+                    settings: { lastBackupAt: null, backupReminderDays: 14 }
+                };
                 CATEGORIES.forEach(c => { appState.budgets[c.id] = 0; });
                 saveToStorage();
                 populateMonthSelect();
+                renderCategoryChips();
                 renderUI();
+                closeModal('settingsModal');
                 showToast('Alle Daten wurden zurückgesetzt.');
             }
         }
@@ -511,6 +929,7 @@
         function markBackupDone() {
             appState.settings.lastBackupAt = new Date().toISOString();
             saveToStorage();
+            updateBackupBanner();
         }
 
         function exportBackup() {
@@ -524,7 +943,6 @@
             const backupJson = JSON.stringify(backup, null, 2);
             const blob = new Blob([backupJson], { type: 'application/json' });
 
-            // Dateiname mit lokaler Zeit YYYY-MM-DD-HHMM
             const now = new Date();
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -533,23 +951,24 @@
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const fileName = `cashcontrol-backup-${year}-${month}-${day}-${hours}${minutes}.json`;
 
-            // Versuche Share API wenn verfügbar
             const file = new File([blob], fileName, { type: 'application/json' });
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                 navigator.share({ files: [file] })
                     .then(() => {
-                        // Erfolg: lastBackupAt setzen
                         markBackupDone();
                         showToast('Backup geteilt.');
                     })
                     .catch(() => {
-                        // Fehler/Abbruch: Fallback auf Download
                         downloadBackupFile(blob, fileName);
                     });
             } else {
-                // Share nicht verfügbar: Download
                 downloadBackupFile(blob, fileName);
             }
+        }
+
+        function exportBackupAndClose() {
+            exportBackup();
+            closeModal('settingsModal');
         }
 
         function downloadBackupFile(blob, fileName) {
@@ -580,6 +999,42 @@
             return daysElapsed > backupReminderDays;
         }
 
+        // B9: Backup-Banner
+        function updateBackupBanner() {
+            const banner = document.getElementById('backupBanner');
+            const bannerText = document.getElementById('backupBannerText');
+
+            const dismissed = localStorage.getItem('cashControl_backupBannerDismissed');
+            const now = Date.now();
+
+            if (dismissed) {
+                const dismissedTime = parseInt(dismissed);
+                const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+                if (now - dismissedTime < sevenDaysMs) {
+                    banner.classList.add('hidden');
+                    return;
+                }
+            }
+
+            if (shouldRemindBackup()) {
+                const lastBackupAt = appState.settings?.lastBackupAt;
+                let daysText = 'noch nie';
+                if (lastBackupAt) {
+                    const daysElapsed = Math.floor((now - new Date(lastBackupAt).getTime()) / (1000 * 60 * 60 * 24));
+                    daysText = daysElapsed === 1 ? '1 Tag' : `${daysElapsed} Tagen`;
+                }
+                bannerText.textContent = `Letztes Backup vor ${daysText}`;
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        function dismissBackupBanner() {
+            localStorage.setItem('cashControl_backupBannerDismissed', String(Date.now()));
+            updateBackupBanner();
+        }
+
         // ---------- A6: Backup-Validierung ----------
         function validateBackup(obj) {
             if (!obj) return { ok: false, data: null, error: 'Datei ist leer', skipped: 0, budgets: null, settings: null };
@@ -589,7 +1044,6 @@
             let budgets = null;
             let settings = null;
 
-            // Akzeptiere sowohl neue Hülle als auch v2-Rohformat
             if (obj.app === 'cashcontrol' && obj.data && Array.isArray(obj.data.transactions)) {
                 transactions = obj.data.transactions;
                 budgets = obj.data.budgets || null;
@@ -604,24 +1058,20 @@
 
             const validTransactions = [];
             transactions.forEach(tx => {
-                // Prüfe type
                 if (tx.type !== 'income' && tx.type !== 'expense') {
                     skipped++;
                     return;
                 }
-                // Prüfe amount
                 const amount = parseFloat(tx.amount);
                 if (!isFinite(amount) || amount <= 0) {
                     skipped++;
                     return;
                 }
-                // Prüfe date
                 const date = new Date(tx.date);
                 if (isNaN(date.getTime())) {
                     skipped++;
                     return;
                 }
-                // Alles OK
                 validTransactions.push(tx);
             });
 
@@ -651,20 +1101,16 @@
                         return;
                     }
 
-                    // Anzahl vor dem Zusammenführen – wird für die Duplikatzählung gebraucht
                     let txBefore = appState.transactions.length;
 
                     if (mode === 'replace') {
                         if (!confirm('Import überschreibt die aktuellen Daten. Fortfahren?')) return;
-                        // Undo-Snapshot VOR Änderung an appState
                         saveUndoSnapshot();
                         appState.transactions = validation.data;
                         appState.budgets = validation.budgets || appState.budgets || {};
                         appState.settings = validation.settings || appState.settings || { lastBackupAt: null, backupReminderDays: 14 };
                     } else if (mode === 'merge') {
-                        // Undo-Snapshot VOR Änderung an appState
                         saveUndoSnapshot();
-                        // Zusammenführen: bestehende + importierte, Duplikate über ID entfernen
                         const merged = [...appState.transactions, ...validation.data];
                         const seen = new Set();
                         appState.transactions = merged.filter(tx => {
@@ -672,9 +1118,7 @@
                             seen.add(tx.id);
                             return true;
                         });
-                        // Absteigend nach Datum sortieren
                         appState.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-                        // Im merge-Modus: bestehende Budgets behalten, nur fehlende Budget-Schlüssel ergänzen
                         if (validation.budgets) {
                             CATEGORIES.forEach(c => {
                                 if (appState.budgets[c.id] === undefined) {
@@ -688,10 +1132,9 @@
                     recomputeTotalCash();
                     saveToStorage();
                     populateMonthSelect();
+                    renderCategoryChips();
                     renderUI();
 
-                    // Duplikate: was beim Zusammenführen wegfiel, also
-                    // (Bestand vorher + gültige importierte) - Länge nach dem Dedup
                     let dupes = 0;
                     if (mode === 'merge') {
                         dupes = Math.max(0, (txBefore + validation.data.length) - appState.transactions.length);
@@ -701,6 +1144,7 @@
                         + (validation.skipped > 0 ? `, ${validation.skipped} übersprungen` : '')
                         + (dupes > 0 ? `, ${dupes} ${dupes === 1 ? 'Duplikat' : 'Duplikate'}` : '');
                     showToast(msg);
+                    closeModal('settingsModal');
                 } catch (err) {
                     showToast('Fehler beim Lesen der Datei: ' + err.message);
                 }
@@ -710,14 +1154,11 @@
         }
 
         // ---------- Helpers ----------
-        // ---------- A9: Amount Parsing ----------
         function parseAmount(str) {
             if (typeof str !== 'string') return NaN;
-            // Komma zu Punkt, Leerzeichen entfernen
             const normalized = str.replace(/,/g, '.').replace(/\s/g, '');
             const num = parseFloat(normalized);
             if (!isFinite(num) || num <= 0) return NaN;
-            // Auf 2 Nachkommastellen runden
             return Math.round(num * 100) / 100;
         }
 
@@ -738,11 +1179,44 @@
         }
 
         function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('modal--open');
+            const firstInput = document.getElementById(id).querySelector('input, button, select');
+            if (firstInput) {
+                setTimeout(() => firstInput.focus(), 100);
+            }
+            window._lastFocusedElement = document.activeElement;
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('modal--open');
+            if (window._lastFocusedElement) {
+                window._lastFocusedElement.focus();
+            }
+        }
+
+        // B6: Modal Keyboard Support
+        function setupModalKeyboard() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    // Close any open modal
+                    ['incomeModal', 'warningModal', 'settingsModal', 'budgetModal'].forEach(id => {
+                        const modal = document.getElementById(id);
+                        if (modal && modal.classList.contains('modal--open')) {
+                            closeModal(id);
+                        }
+                    });
+                }
+            });
+
+            // Click outside closes modal
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        const id = modal.id;
+                        closeModal(id);
+                    }
+                });
+            });
         }
 
         function generateId() {
@@ -810,12 +1284,34 @@
             return categorySums;
         }
 
+        // B4: Category Chips
+        function renderCategoryChips() {
+            const container = document.getElementById('categoryChips');
+            container.innerHTML = CATEGORIES.map(cat => {
+                const isActive = cat.id === selectedCategory ? 'chip--active' : '';
+                return `<button type="button" class="chip ${isActive}" onclick="selectCategory('${escapeAttr(cat.id)}')" title="${cat.label}">
+                    ${cat.icon} ${cat.label}
+                </button>`;
+            }).join('');
+        }
+
+        function selectCategory(catId) {
+            selectedCategory = catId;
+            renderCategoryChips();
+        }
+
+        // B4: FAB
+        function scrollToExpenseForm() {
+            const form = document.getElementById('expenseForm');
+            form.scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('expenseAmount').focus();
+        }
+
         // ---------- Expense Flow ----------
         function handleAddExpense(event) {
             event.preventDefault();
             const amountStr = document.getElementById('expenseAmount').value;
             const amount = parseAmount(amountStr);
-            const category = document.getElementById('expenseCategory').value;
             const note = document.getElementById('expenseNote').value.trim();
 
             if (isNaN(amount)) {
@@ -825,7 +1321,7 @@
             }
 
             if (amount > appState.totalCash) {
-                pendingExpense = { amount, category, note, overBudget: 'cash' };
+                pendingExpense = { amount, category: selectedCategory, note, overBudget: 'cash' };
                 document.getElementById('warningTitle').innerText = 'Nicht genug Bargeld!';
                 document.getElementById('warningText').innerText =
                     `Dein Bargeldbestand beträgt nur ${formatEuro(appState.totalCash)}. Trotzdem als Ausgabe verbuchen (Bestand geht auf 0,00 €)?`;
@@ -837,7 +1333,7 @@
             const limit = getDailyLimit();
 
             if (limit > 0 && (todaySpent + amount) > limit + 0.005) {
-                pendingExpense = { amount, category, note, overBudget: 'daily' };
+                pendingExpense = { amount, category: selectedCategory, note, overBudget: 'daily' };
                 document.getElementById('warningTitle').innerText = 'Achtung: Tageslimit erreicht!';
                 document.getElementById('warningText').innerText =
                     'Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?';
@@ -845,7 +1341,7 @@
                 return;
             }
 
-            commitExpense(amount, category, note);
+            commitExpense(amount, selectedCategory, note);
         }
 
         function commitExpense(amount, category, note) {
@@ -923,9 +1419,31 @@
             showToast('Buchung gelöscht.');
         }
 
+        // B8: Transaction Filter
+        function setTxFilter(filter) {
+            transactionFilter = filter;
+            transactionDisplayCount = 30;
+            renderTransactions();
+            document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function loadMoreTransactions() {
+            transactionDisplayCount += 30;
+            renderTransactions();
+        }
+
         // ---------- Render ----------
         function renderUI() {
-            document.getElementById('totalCashDisplay').innerText = formatEuro(appState.totalCash);
+            const totalCash = appState.totalCash;
+            const totalCashEl = document.getElementById('totalCashDisplay');
+            if (totalCash < 0) {
+                totalCashEl.style.color = '#ef4444';
+                totalCashEl.innerText = formatEuro(Math.abs(totalCash)) + ' Schulden';
+            } else {
+                totalCashEl.style.color = '#10b981';
+                totalCashEl.innerText = formatEuro(totalCash);
+            }
 
             const daysRemaining = getDaysRemainingInMonth();
             document.getElementById('daysLeftDisplay').innerText = daysRemaining;
@@ -937,17 +1455,34 @@
             document.getElementById('targetDailyDisplay').innerText = formatEuro(dailyLimit);
             document.getElementById('todaySpentDisplay').innerText = formatEuro(todaySpent);
 
-            renderTrafficLight(todaySpent, dailyLimit);
+            // B3: Remaining for today
+            const todayRemaining = Math.max(0, dailyLimit - todaySpent);
+            document.getElementById('todayRemainingDisplay').innerText = formatEuro(todayRemaining);
+
+            renderTrafficLight(todaySpent, dailyLimit, totalCash);
             renderCategoryBreakdown();
             renderTransactions();
+            updateBackupBanner();
         }
 
-        function renderTrafficLight(spent, limit) {
+        function renderTrafficLight(spent, limit, totalCash) {
             const statusCard = document.getElementById('statusCard');
             const dot = document.getElementById('trafficLightDot');
             const badge = document.getElementById('statusBadge');
             const message = document.getElementById('statusMessage');
             const progressBar = document.getElementById('dailyProgressBar');
+
+            // B3: Bei Bestand ≤ 0
+            if (totalCash <= 0) {
+                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/20 border-red-500/50";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
+                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
+                badge.innerText = "Kein Bargeld mehr";
+                message.innerText = "Dein Bargeldbestand ist aufgebraucht – heute nichts mehr ausgeben.";
+                progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
+                progressBar.style.width = "100%";
+                return;
+            }
 
             let ratio = limit > 0 ? (spent / limit) : (spent > 0 ? 1 : 0);
             let pct = Math.min(100, Math.round(ratio * 100));
@@ -995,7 +1530,26 @@
 
             CATEGORIES.forEach(cat => {
                 const spent = monthlyData[cat.id] || 0;
-                const pct = totalSpentMonth > 0 ? Math.round((spent / totalSpentMonth) * 100) : 0;
+                const budget = appState.budgets?.[cat.id] || 0;
+
+                let pct = 0;
+                let barColor = cat.color;
+                let displayText = '';
+
+                if (budget > 0) {
+                    // B7: Gegen das Budget
+                    pct = Math.min(100, Math.round((spent / budget) * 100));
+                    displayText = `${formatEuro(spent)} / ${formatEuro(budget)}`;
+                    if (spent > budget) {
+                        barColor = 'bg-red-500';
+                    }
+                } else {
+                    // Ohne Budget: anteilig
+                    pct = totalSpentMonth > 0 ? Math.round((spent / totalSpentMonth) * 100) : 0;
+                    displayText = `${formatEuro(spent)} (${pct}%)`;
+                }
+
+                const overBudgetHint = budget > 0 && spent > budget ? '<div class="text-[10px] text-red-400 mt-1">Über Budget!</div>' : '';
 
                 const itemHtml = `
                     <div class="space-y-1">
@@ -1003,58 +1557,106 @@
                             <span class="text-slate-300 font-medium flex items-center gap-1.5">
                                 <span>${cat.icon}</span> ${cat.label}
                             </span>
-                            <span class="text-slate-400 font-semibold">${formatEuro(spent)} <span class="text-slate-500">(${pct}%)</span></span>
+                            <span class="text-slate-400 font-semibold">${displayText}</span>
                         </div>
                         <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
-                            <div class="${cat.color} h-full rounded-full" style="width: ${pct}%"></div>
+                            <div class="${barColor} h-full rounded-full" style="width: ${pct}%"></div>
                         </div>
+                        ${overBudgetHint}
                     </div>
                 `;
                 container.innerHTML += itemHtml;
             });
         }
 
+        // B8: Transactions with grouping by date
         function renderTransactions() {
             const container = document.getElementById('transactionList');
             const countDisplay = document.getElementById('txCount');
+            const moreBtn = document.getElementById('moreBtn');
 
             countDisplay.innerText = `${appState.transactions.length} Einträge`;
 
             if (appState.transactions.length === 0) {
                 container.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Noch keine Buchungen vorhanden.</p>';
+                moreBtn.classList.add('hidden');
                 return;
             }
 
-            const recent = appState.transactions.slice(0, 30);
+            // Filter transactions
+            const filtered = appState.transactions.filter(tx => {
+                if (transactionFilter === 'all') return true;
+                return tx.type === transactionFilter;
+            });
 
-            container.innerHTML = recent.map(tx => {
-                const isExpense = tx.type === 'expense';
-                const cat = CATEGORIES.find(c => c.id === tx.category);
-                const icon = escapeHtml(isExpense ? (cat ? cat.icon : '📦') : '💶');
-                const label = escapeHtml(isExpense ? (cat ? cat.label : (tx.category || 'Unbekannt')) : (tx.source || 'Einnahme'));
-                const dateLabel = new Date(tx.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                const sign = isExpense ? '−' : '+';
-                const colorClass = isExpense ? 'text-red-400' : 'text-emerald-400';
-                const noteHtml = tx.note ? ' · ' + escapeHtml(tx.note) : '';
+            const toDisplay = filtered.slice(0, transactionDisplayCount);
+            const hasMore = filtered.length > transactionDisplayCount;
 
-                return `
-                    <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-3 py-2.5">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                            <span class="text-lg leading-none">${icon}</span>
-                            <div class="min-w-0">
-                                <div class="text-xs font-medium text-slate-200 truncate">${label}${noteHtml}</div>
-                                <div class="text-[10px] text-slate-500">${dateLabel}</div>
+            if (hasMore) {
+                moreBtn.classList.remove('hidden');
+            } else {
+                moreBtn.classList.add('hidden');
+            }
+
+            // Group by date
+            const grouped = {};
+            toDisplay.forEach(tx => {
+                const key = txLocalDateKey(tx);
+                if (!grouped[key]) {
+                    grouped[key] = [];
+                }
+                grouped[key].push(tx);
+            });
+
+            const today = toLocalDateKey(new Date());
+            const yesterday = new Date(new Date().setDate(new Date().getDate() - 1));
+            const yesterdayKey = toLocalDateKey(yesterday);
+
+            const sortedKeys = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+
+            container.innerHTML = sortedKeys.map(dateKey => {
+                let dateLabel = '';
+                if (dateKey === today) {
+                    dateLabel = 'Heute';
+                } else if (dateKey === yesterdayKey) {
+                    dateLabel = 'Gestern';
+                } else {
+                    const date = new Date(dateKey);
+                    dateLabel = date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                }
+
+                const txHtml = grouped[dateKey].map(tx => {
+                    const isExpense = tx.type === 'expense';
+                    const cat = CATEGORIES.find(c => c.id === tx.category);
+                    const icon = escapeHtml(isExpense ? (cat ? cat.icon : '📦') : '💶');
+                    const label = escapeHtml(isExpense ? (cat ? cat.label : (tx.category || 'Unbekannt')) : (tx.source || 'Einnahme'));
+                    const sign = isExpense ? '−' : '+';
+                    const colorClass = isExpense ? 'text-red-400' : 'text-emerald-400';
+                    const noteHtml = tx.note ? ' · ' + escapeHtml(tx.note) : '';
+
+                    return `
+                        <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-3 py-2.5">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <span class="text-lg leading-none">${icon}</span>
+                                <div class="min-w-0">
+                                    <div class="text-xs font-medium text-slate-200 truncate">${label}${noteHtml}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
+                                <button class="deleteBtn text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeAttr(tx.id)}">✕</button>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
-                            <button class="deleteBtn text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeAttr(tx.id)}">✕</button>
-                        </div>
-                    </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="tx-group-header">${dateLabel}</div>
+                    <div class="space-y-2">${txHtml}</div>
                 `;
             }).join('');
 
-            // Delegierter Listener einmalig registrieren (wenn nicht schon vorhanden)
+            // Delegierter Listener
             if (!container._delegateListenerAdded) {
                 container.addEventListener('click', (e) => {
                     if (e.target.classList.contains('deleteBtn')) {
@@ -1064,6 +1666,108 @@
                 });
                 container._delegateListenerAdded = true;
             }
+        }
+
+        // B1: Settings Sheet
+        function openSettingsSheet() {
+            renderSettingsSheet();
+            openModal('settingsModal');
+        }
+
+        function renderSettingsSheet() {
+            const content = document.getElementById('settingsSheetContent');
+            let html = '';
+
+            // Standard options
+            html += `
+                <button class="settings-sheet-item" onclick="exportBackup(); closeModal('settingsModal');">
+                    Backup exportieren
+                </button>
+            `;
+
+            // Import Replace
+            html += `
+                <button class="settings-sheet-item" onclick="document.getElementById('importFileReplace').click();">
+                    Backup importieren (ersetzen)
+                </button>
+                <input type="file" id="importFileReplace" accept="application/json" onchange="importBackup(event, 'replace')" style="display:none;">
+            `;
+
+            // Import Merge
+            html += `
+                <button class="settings-sheet-item" onclick="document.getElementById('importFileMerge').click();">
+                    Backup importieren (zusammenführen)
+                </button>
+                <input type="file" id="importFileMerge" accept="application/json" onchange="importBackup(event, 'merge')" style="display:none;">
+            `;
+
+            // Undo (conditional)
+            if (hasUndoSnapshot()) {
+                html += `
+                    <button class="settings-sheet-item" onclick="undoLastDestructive();">
+                        Letzte Aktion rückgängig
+                    </button>
+                `;
+            }
+
+            // Install (conditional)
+            if (canInstallApp()) {
+                html += `
+                    <button class="settings-sheet-item" onclick="triggerInstallPrompt(); closeModal('settingsModal');">
+                        App installieren
+                    </button>
+                `;
+            }
+
+            // Budget
+            html += `
+                <button class="settings-sheet-item" onclick="openBudgetModal();">
+                    Kategorie-Budgets
+                </button>
+            `;
+
+            // Divider
+            html += `<div class="modal-divider"></div>`;
+
+            // Reset (danger)
+            html += `
+                <button class="settings-sheet-item danger" onclick="resetAllData();">
+                    Alle Daten zurücksetzen
+                </button>
+            `;
+
+            content.innerHTML = html;
+        }
+
+        // B7: Budget Modal
+        function openBudgetModal() {
+            const form = document.getElementById('budgetInputs');
+            form.innerHTML = CATEGORIES.map(cat => {
+                const currentBudget = appState.budgets?.[cat.id] || 0;
+                const displayValue = currentBudget > 0 ? currentBudget : '';
+                return `
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">${cat.label}</label>
+                        <input type="number" id="budget-${escapeAttr(cat.id)}" inputmode="decimal" step="0.01" min="0" placeholder="Kein Limit" value="${displayValue}"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500">
+                    </div>
+                `;
+            }).join('');
+            openModal('budgetModal');
+        }
+
+        function saveBudgets(event) {
+            event.preventDefault();
+            CATEGORIES.forEach(cat => {
+                const input = document.getElementById(`budget-${cat.id}`);
+                const value = input.value.trim();
+                const amount = value ? parseFloat(value) : 0;
+                appState.budgets[cat.id] = isFinite(amount) && amount > 0 ? amount : 0;
+            });
+            saveToStorage();
+            renderUI();
+            closeModal('budgetModal');
+            showToast('Budgets gespeichert.');
         }
 
         // ---------- A11: Category Budgets (Logik) ----------
@@ -1088,11 +1792,9 @@
             let over = false;
 
             if (isBudgetSet) {
-                // Gegen das gesetzte Budget
                 pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
                 over = spent > budget;
             } else {
-                // Gegen die Monatssumme
                 const monthTotal = appState.transactions
                     .filter(tx => tx.type === 'expense' && txLocalMonthKey(tx) === monthKey)
                     .reduce((sum, tx) => sum + tx.amount, 0);
