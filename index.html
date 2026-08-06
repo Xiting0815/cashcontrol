@@ -117,9 +117,13 @@
         input[type="number"]:focus,
         select:focus,
         textarea:focus {
-            outline: none;
             border-color: #10b981;
             box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+        }
+
+        :focus-visible {
+            outline: 2px solid #34d399;
+            outline-offset: 2px;
         }
 
         button {
@@ -451,7 +455,7 @@
 
             <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
                 <div class="flex justify-between text-xs text-slate-400">
-                    <span>davon reserviert:</span>
+                    <span>davon eingeplant:</span>
                     <span class="text-slate-200 font-semibold" id="reservedAmountDisplay">0,00 €</span>
                 </div>
                 <div class="flex justify-between text-xs text-slate-400">
@@ -462,7 +466,7 @@
         </section>
 
         <!-- B3: Daily Status / Traffic Light Indicator -->
-        <section id="statusCard" class="border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700">
+        <section id="statusCard" class="border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700" aria-live="polite">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center space-x-2">
                     <span id="trafficLightDot" class="w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm"></span>
@@ -477,10 +481,10 @@
             <div class="space-y-1.5">
                 <div class="flex justify-between text-xs font-medium">
                     <span class="text-slate-400">Ausgegeben: <span id="todaySpentDisplay" class="text-slate-200 font-bold">0,00 €</span></span>
-                    <span class="text-slate-400">Ziel: <span id="targetDailyDisplay" class="text-slate-200">0,00 €</span></span>
+                    <span class="text-slate-400">Tagesbudget: <span id="targetDailyDisplay" class="text-slate-200">0,00 €</span></span>
                 </div>
                 <div class="w-full bg-slate-700/60 rounded-full h-3 overflow-hidden p-0.5">
-                    <div id="dailyProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    <div id="dailyProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
                 </div>
                 <!-- B3: Remaining for today in Euro -->
                 <div class="text-right">
@@ -500,7 +504,7 @@
         <!-- A7: Quick Expense Form (moved before reservations) -->
         <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
             <h2 class="font-bold text-base text-slate-100 mb-3 flex items-center gap-2">
-                <span>⚡</span> Ausgabe eintragen
+                <span>⚡</span> Ausgabe buchen
             </h2>
 
             <!-- B4: Category Chips (horizontal scroll) -->
@@ -508,20 +512,20 @@
 
             <form id="expenseForm" onsubmit="handleAddExpense(event)" class="space-y-3">
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
+                    <label for="expenseAmount" class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
                     <input type="text" id="expenseAmount" inputmode="decimal" placeholder="0,00" required
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Notiz (Optional)</label>
+                    <label for="expenseNote" class="block text-xs font-medium text-slate-400 mb-1">Notiz (Optional)</label>
                     <input type="text" id="expenseNote" placeholder="z. B. Futtertiere, Supermarkt..."
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-sm focus:border-emerald-500">
                 </div>
 
                 <button type="submit"
                     class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl shadow-lg transition-all active:scale-[0.99] text-sm">
-                    Bargeld-Ausgabe buchen
+                    Ausgabe buchen
                 </button>
             </form>
         </section>
@@ -539,12 +543,12 @@
             <form id="reservationForm" onsubmit="handleAddReservation(event)" class="space-y-3 mb-4 pb-4 border-b border-slate-700/50">
                 <div>
                     <input type="text" id="reservationLabel" placeholder="z.B. Tabak, Arzt..."
-                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 min-h-11">
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-emerald-500 min-h-11" aria-label="Bezeichnung der geplanten Ausgabe">
                 </div>
                 <div class="flex gap-2">
                     <input type="text" id="reservationAmount" inputmode="decimal" placeholder="10,00"
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 min-h-11">
-                    <select id="reservationCategory" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 min-h-11">
+                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-emerald-500 min-h-11" aria-label="Betrag der geplanten Ausgabe">
+                    <select id="reservationCategory" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-emerald-500 min-h-11" aria-label="Kategorie der geplanten Ausgabe">
                         <option value="">Kategorie</option>
                         <option value="Haushalt/Essen">🛒 Essen</option>
                         <option value="Tabak">🚬 Tabak</option>
@@ -560,7 +564,7 @@
 
             <!-- Reservations List -->
             <div id="reservationsList" class="space-y-2">
-                <p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
+                <p class="text-xs text-slate-400 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
             </div>
         </section>
 
@@ -572,7 +576,7 @@
                     <button onclick="openMonthReport(document.getElementById('categoryMonthSelect').value)" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded-lg font-medium transition-all">
                         Details
                     </button>
-                    <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300"></select>
+                    <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300" aria-label="Monat für die Kategorieübersicht"></select>
                 </div>
             </div>
             <div id="categoryBreakdown" class="space-y-3"></div>
@@ -582,19 +586,19 @@
         <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
             <div class="flex justify-between items-center mb-3">
                 <h2 class="font-bold text-base text-slate-100">Letzte Bewegungen</h2>
-                <span class="text-xs text-slate-500" id="txCount">0 Einträge</span>
+                <span class="text-xs text-slate-400" id="txCount">0 Einträge</span>
             </div>
 
             <!-- B8: Filter Chips -->
             <div class="filter-chips">
-                <button class="filter-chip active" onclick="setTxFilter('all')">Alle</button>
-                <button class="filter-chip" onclick="setTxFilter('expense')">Ausgaben</button>
-                <button class="filter-chip" onclick="setTxFilter('income')">Einnahmen</button>
+                <button class="filter-chip active" onclick="setTxFilter('all')" aria-pressed="true">Alle</button>
+                <button class="filter-chip" onclick="setTxFilter('expense')" aria-pressed="false">Ausgaben</button>
+                <button class="filter-chip" onclick="setTxFilter('income')" aria-pressed="false">Einnahmen</button>
             </div>
 
             <!-- Transaction List -->
             <div id="transactionList" class="space-y-2 max-h-96 overflow-y-auto pr-1">
-                <p class="text-xs text-slate-500 text-center py-4">Noch keine Buchungen vorhanden.</p>
+                <p class="text-xs text-slate-400 text-center py-4">Noch keine Buchungen vorhanden.</p>
             </div>
 
             <!-- B8: "More" button -->
@@ -604,7 +608,7 @@
     </main>
 
     <!-- B4: FAB (Floating Action Button) -->
-    <button class="fab" onclick="scrollToExpenseForm()" aria-label="Ausgabe eintragen" title="Ausgabe eintragen">
+    <button class="fab" onclick="scrollToExpenseForm()" aria-label="Ausgabe buchen" title="Ausgabe buchen">
         ⚡
     </button>
 
@@ -614,13 +618,13 @@
             <h3 class="modal-header" id="incomeModalTitle">Bargeld erhalten</h3>
             <form onsubmit="handleAddIncome(event)" class="space-y-3">
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
-                    <input type="text" id="incomeAmount" inputmode="decimal" placeholder="50.00" required
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500">
+                    <label for="incomeAmount" class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
+                    <input type="text" id="incomeAmount" inputmode="decimal" placeholder="50,00" required
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Quelle</label>
-                    <select id="incomeSource" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
+                    <label for="incomeSource" class="block text-xs font-medium text-slate-400 mb-1">Quelle</label>
+                    <select id="incomeSource" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-200 text-sm focus:border-emerald-500">
                         <option value="Taschengeld Vater">Taschengeld Vater</option>
                         <option value="Arbeit/Nebenjob">Arbeit / Nebenjob</option>
                         <option value="Sonstiges Cash">Sonstiges Cash</option>
@@ -646,7 +650,7 @@
             <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30 mb-4">
                 ⚠️
             </div>
-            <h3 class="modal-header text-center" id="warningTitle">Achtung: Tageslimit erreicht!</h3>
+            <h3 class="modal-header text-center" id="warningTitle">Achtung: Tagesbudget erreicht!</h3>
             <p class="text-xs text-slate-300 leading-relaxed mb-4 text-center" id="warningText">
                 Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?
             </p>
@@ -700,7 +704,7 @@
         <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="modal-header" id="monthReportTitle">Monatsabschluss</h3>
-                <select id="reportMonthSelect" onchange="renderMonthReport()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300"></select>
+                <select id="reportMonthSelect" onchange="renderMonthReport()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300" aria-label="Monat für den Monatsabschluss"></select>
             </div>
             <div id="monthReportContent" class="space-y-4 mb-4">
                 <!-- Content rendered dynamically -->
@@ -719,7 +723,7 @@
     </div>
 
     <!-- Toast -->
-    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-4 py-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 z-[60]"></div>
+    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-4 py-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 z-[60]" role="status" aria-live="polite"></div>
 
     <script>
         const STORAGE_KEY = 'cashControl_state_v2';
@@ -1704,7 +1708,7 @@
 
             if (report.txCount === 0) {
                 container.innerHTML = `
-                    <p class="text-xs text-slate-500 text-center py-6">In diesem Monat gibt es keine Buchungen.</p>
+                    <p class="text-xs text-slate-400 text-center py-6">In diesem Monat gibt es keine Buchungen.</p>
                 `;
                 return;
             }
@@ -1844,7 +1848,8 @@
             const container = document.getElementById('categoryChips');
             container.innerHTML = CATEGORIES.map(cat => {
                 const isActive = cat.id === selectedCategory ? 'chip--active' : '';
-                return `<button type="button" class="chip ${isActive}" onclick="selectCategory('${escapeAttr(cat.id)}')" title="${cat.label}">
+                const ariaPressed = cat.id === selectedCategory ? 'true' : 'false';
+                return `<button type="button" class="chip ${isActive}" onclick="selectCategory('${escapeAttr(cat.id)}')" title="${cat.label}" aria-pressed="${ariaPressed}">
                     ${cat.icon} ${cat.label}
                 </button>`;
             }).join('');
@@ -1889,7 +1894,7 @@
 
             if (limit > 0 && (todaySpent + amount) > limit + 0.005) {
                 pendingExpense = { amount, category: selectedCategory, note, overBudget: 'daily' };
-                document.getElementById('warningTitle').innerText = 'Achtung: Tageslimit erreicht!';
+                document.getElementById('warningTitle').innerText = 'Achtung: Tagesbudget erreicht!';
 
                 // A4: Dynamischer Text mit Zahlen
                 const overAmount = (todaySpent + amount) - limit;
@@ -2051,8 +2056,12 @@
             transactionFilter = filter;
             transactionDisplayCount = 30;
             renderTransactions();
-            document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.remove('active');
+                chip.setAttribute('aria-pressed', 'false');
+            });
             event.target.classList.add('active');
+            event.target.setAttribute('aria-pressed', 'true');
         }
 
         function loadMoreTransactions() {
@@ -2067,7 +2076,7 @@
             const reservations = getReservations().filter(r => r.month === mk);
 
             if (reservations.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>';
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>';
                 return;
             }
 
@@ -2086,11 +2095,11 @@
                             <div class="text-sm font-semibold text-slate-400 ${doneClass}">${formatEuro(res.amount)}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
-                            <button class="reservationDoneBtn text-xs px-2 py-1.5 rounded-md transition-all ${res.done ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}" title="${res.done ? 'Rückgängig' : 'Erledigt'}" data-id="${escapeAttr(res.id)}">
-                                ${res.done ? '✓' : '○'}
+                            <button class="reservationDoneBtn text-xs px-2 py-1.5 rounded-md transition-all ${res.done ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}" title="${res.done ? 'Rückgängig' : 'Erledigt'}" data-id="${escapeAttr(res.id)}" aria-label="${res.done ? 'Als offen markieren' : 'Als erledigt markieren'}">
+                                <span aria-hidden="true">${res.done ? '✓' : '○'}</span>
                             </button>
-                            <button class="reservationDeleteBtn text-xs px-2 py-1.5 text-slate-600 hover:text-red-400 rounded-md transition-all hover:bg-red-500/10" title="Löschen" data-id="${escapeAttr(res.id)}">
-                                ✕
+                            <button class="reservationDeleteBtn text-xs px-2 py-1.5 text-slate-400 hover:text-red-400 rounded-md transition-all hover:bg-red-500/10" title="Löschen" data-id="${escapeAttr(res.id)}" aria-label="Geplante Ausgabe löschen">
+                                <span aria-hidden="true">✕</span>
                             </button>
                         </div>
                     </div>
@@ -2217,6 +2226,7 @@
             let pct = Math.min(100, Math.round(ratio * 100));
 
             progressBar.style.width = pct + '%';
+            progressBar.setAttribute('aria-valuenow', pct);
             statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 ";
 
             if (spent > limit && limit > 0) {
@@ -2224,14 +2234,14 @@
                 dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
                 badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
                 badge.innerText = "Limit überschritten!";
-                message.innerText = "Achtung: Du hast dein Tagesziel überschritten. Stopper einlegen: Brauchst du weitere Käufe heute wirklich?";
+                message.innerText = "Achtung: Du hast dein Tagesbudget überschritten. Stopper einlegen: Brauchst du weitere Käufe heute wirklich?";
                 progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
             } else if (ratio >= 0.75) {
                 statusCard.classList.add('border-amber-500/50', 'bg-amber-950/20');
                 dot.className = "w-3.5 h-3.5 rounded-full bg-amber-500 inline-block shadow-sm";
                 badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20";
                 badge.innerText = "Warnung: Fast am Limit";
-                message.innerText = "Du näherst dich deinem Tageslimit. Halte inne und vermeide weitere spontane Ausgaben.";
+                message.innerText = "Du näherst dich deinem Tagesbudget. Halte inne und vermeide weitere spontane Ausgaben.";
                 progressBar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
             } else {
                 statusCard.classList.add('border-slate-700');
@@ -2251,7 +2261,7 @@
             const totalSpentMonth = Object.values(monthlyData).reduce((a, b) => a + b, 0);
 
             if (totalSpentMonth === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-2">Keine Ausgaben in diesem Monat.</p>';
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-2">Keine Ausgaben in diesem Monat.</p>';
                 return;
             }
 
@@ -2278,7 +2288,7 @@
                     displayText = `${formatEuro(spent)} (${pct}%)`;
                 }
 
-                const overBudgetHint = budget > 0 && spent > budget ? '<div class="text-[10px] text-red-400 mt-1">Über Budget!</div>' : '';
+                const overBudgetHint = budget > 0 && spent > budget ? '<div class="text-xs text-red-400 mt-1">Über Budget!</div>' : '';
 
                 const itemHtml = `
                     <div class="space-y-1">
@@ -2307,7 +2317,7 @@
             countDisplay.innerText = `${appState.transactions.length} Einträge`;
 
             if (appState.transactions.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Noch keine Buchungen vorhanden.</p>';
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Noch keine Buchungen vorhanden.</p>';
                 moreBtn.classList.add('hidden');
                 return;
             }
@@ -2373,7 +2383,7 @@
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
                                 <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
-                                <button class="deleteBtn text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeAttr(tx.id)}">✕</button>
+                                <button class="deleteBtn text-slate-400 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeAttr(tx.id)}" aria-label="Buchung löschen"><span aria-hidden="true">✕</span></button>
                             </div>
                         </div>
                     `;
@@ -2483,9 +2493,9 @@
                 const displayValue = currentBudget > 0 ? currentBudget : '';
                 return `
                     <div>
-                        <label class="block text-xs font-medium text-slate-400 mb-1">${cat.label}</label>
+                        <label for="budget-${escapeAttr(cat.id)}" class="block text-xs font-medium text-slate-400 mb-1">${cat.label}</label>
                         <input type="number" id="budget-${escapeAttr(cat.id)}" inputmode="decimal" step="0.01" min="0" placeholder="Kein Limit" value="${displayValue}"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:outline-none focus:border-emerald-500">
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
                     </div>
                 `;
             }).join('');
