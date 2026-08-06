@@ -444,6 +444,11 @@
         }
 
         // ---------- Backup Export / Import ----------
+        function markBackupDone() {
+            appState.settings.lastBackupAt = new Date().toISOString();
+            saveToStorage();
+        }
+
         function exportBackup() {
             const backup = {
                 app: 'cashcontrol',
@@ -467,18 +472,20 @@
             // Versuche Share API wenn verfügbar
             const file = new File([blob], fileName, { type: 'application/json' });
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                navigator.share({ files: [file] }).catch(() => {
-                    // Fehler: Fallback auf Download
-                    downloadBackupFile(blob, fileName);
-                });
+                navigator.share({ files: [file] })
+                    .then(() => {
+                        // Erfolg: lastBackupAt setzen
+                        markBackupDone();
+                        showToast('Backup geteilt.');
+                    })
+                    .catch(() => {
+                        // Fehler/Abbruch: Fallback auf Download
+                        downloadBackupFile(blob, fileName);
+                    });
             } else {
                 // Share nicht verfügbar: Download
                 downloadBackupFile(blob, fileName);
             }
-
-            // lastBackupAt setzen
-            appState.settings.lastBackupAt = new Date().toISOString();
-            saveToStorage();
         }
 
         function downloadBackupFile(blob, fileName) {
@@ -490,6 +497,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            markBackupDone();
             showToast('Backup exportiert.');
         }
 
@@ -579,10 +587,19 @@
                         return;
                     }
 
+                    // Anzahl vor dem Zusammenführen – wird für die Duplikatzählung gebraucht
+                    let txBefore = appState.transactions.length;
+
                     if (mode === 'replace') {
                         if (!confirm('Import überschreibt die aktuellen Daten. Fortfahren?')) return;
+                        // Undo-Snapshot VOR Änderung an appState
+                        saveUndoSnapshot();
                         appState.transactions = validation.data;
+                        appState.budgets = validation.budgets || appState.budgets || {};
+                        appState.settings = validation.settings || appState.settings || { lastBackupAt: null, backupReminderDays: 14 };
                     } else if (mode === 'merge') {
+                        // Undo-Snapshot VOR Änderung an appState
+                        saveUndoSnapshot();
                         // Zusammenführen: bestehende + importierte, Duplikate über ID entfernen
                         const merged = [...appState.transactions, ...validation.data];
                         const seen = new Set();
@@ -593,10 +610,15 @@
                         });
                         // Absteigend nach Datum sortieren
                         appState.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        // Im merge-Modus: bestehende Budgets behalten, nur fehlende Budget-Schlüssel ergänzen
+                        if (validation.budgets) {
+                            CATEGORIES.forEach(c => {
+                                if (appState.budgets[c.id] === undefined) {
+                                    appState.budgets[c.id] = validation.budgets[c.id] || 0;
+                                }
+                            });
+                        }
                     }
-
-                    // Undo-Snapshot speichern vor Import
-                    saveUndoSnapshot();
 
                     migrateState();
                     recomputeTotalCash();
@@ -604,12 +626,16 @@
                     populateMonthSelect();
                     renderUI();
 
+                    // Duplikate: was beim Zusammenführen wegfiel, also
+                    // (Bestand vorher + gültige importierte) - Länge nach dem Dedup
                     let dupes = 0;
                     if (mode === 'merge') {
-                        dupes = Math.max(0, (parsed.data?.transactions?.length || parsed.transactions?.length || 0) - validation.data.length + validation.skipped);
+                        dupes = Math.max(0, (txBefore + validation.data.length) - appState.transactions.length);
                     }
 
-                    const msg = `${validation.data.length} übernommen${validation.skipped > 0 ? ', ' + validation.skipped + ' übersprungen' : ''}${dupes > 0 ? ', ' + dupes + ' Duplikate' : ''}`;
+                    const msg = `${validation.data.length} übernommen`
+                        + (validation.skipped > 0 ? `, ${validation.skipped} übersprungen` : '')
+                        + (dupes > 0 ? `, ${dupes} ${dupes === 1 ? 'Duplikat' : 'Duplikate'}` : '');
                     showToast(msg);
                 } catch (err) {
                     showToast('Fehler beim Lesen der Datei: ' + err.message);
@@ -958,7 +984,7 @@
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
-                            <button class="deleteBtn text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeHtml(tx.id)}">✕</button>
+                            <button class="deleteBtn text-slate-600 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeAttr(tx.id)}">✕</button>
                         </div>
                     </div>
                 `;
@@ -1017,6 +1043,11 @@
             const div = document.createElement('div');
             div.innerText = str;
             return div.innerHTML;
+        }
+
+        function escapeAttr(str) {
+            if (typeof str !== 'string') return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
     </script>
 </body>
