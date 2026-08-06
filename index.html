@@ -68,6 +68,7 @@
             max-width: 448px;
             margin: 0 auto;
             padding: 1rem;
+            padding-bottom: 88px;
         }
 
         section {
@@ -235,10 +236,10 @@
             font-size: 0.75rem;
         }
 
-        /* B4: FAB */
+        /* A8: FAB */
         .fab {
             position: fixed;
-            bottom: 1.5rem;
+            bottom: calc(1.5rem + env(safe-area-inset-bottom));
             right: 1.5rem;
             width: 56px;
             height: 56px;
@@ -253,34 +254,39 @@
             border: none;
             cursor: pointer;
             z-index: 40;
-            padding-bottom: env(safe-area-inset-bottom);
         }
 
         .fab:hover {
             background-color: #10b981;
         }
 
-        /* B4: Chip-Reihe */
+        /* A5: Chip-Reihe als Grid */
         .chip-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
             gap: 0.5rem;
-            overflow-x: auto;
-            padding-bottom: 0.5rem;
             margin-bottom: 0.75rem;
-            scroll-behavior: smooth;
+            min-height: 44px;
         }
 
         .chip {
-            flex-shrink: 0;
             background-color: #0f172a;
             border: 1px solid #334155;
             border-radius: 1.5rem;
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
             cursor: pointer;
-            white-space: nowrap;
             transition: all 0.2s ease-in-out;
             color: #cbd5e1;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Ohne min-width:0 wächst ein Chip über seine 1fr-Spalte hinaus, sobald
+               der Text länger ist – dann läuft die Reihe wieder seitlich über. */
+            min-width: 0;
+            text-align: center;
+            hyphens: auto;
         }
 
         .chip:hover {
@@ -437,11 +443,10 @@
                     + Geld erhalten
                 </button>
             </div>
-            <div class="text-4xl font-extrabold tracking-tight mb-4" id="totalCashDisplay" style="color: #10b981;">0,00 €</div>
+            <div class="text-2xl font-extrabold tracking-tight mb-4" id="totalCashDisplay" style="color: #10b981;">0,00 €</div>
 
-            <div class="pt-3 border-t border-slate-700/50 flex justify-between text-xs text-slate-400">
+            <div class="pt-3 border-t border-slate-700/50 text-xs text-slate-400">
                 <span>Verbleibende Tage: <strong class="text-slate-200" id="daysLeftDisplay">--</strong></span>
-                <span>Tageslimit: <strong class="text-emerald-400" id="suggestedDailyDisplay">0,00 €</strong></span>
             </div>
 
             <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
@@ -478,8 +483,11 @@
                     <div id="dailyProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
                 </div>
                 <!-- B3: Remaining for today in Euro -->
-                <div class="text-xs text-slate-400 text-right">
-                    Verbleibend heute: <span id="todayRemainingDisplay" class="text-emerald-400 font-semibold">0,00 €</span>
+                <div class="text-right">
+                    <div class="text-xs text-slate-400 mb-1">
+                        <span id="todayRemainingLabel">Verbleibend heute</span>
+                    </div>
+                    <div class="text-4xl font-extrabold" id="todayRemainingDisplay" style="color: #10b981;">0,00 €</div>
                 </div>
             </div>
 
@@ -489,43 +497,7 @@
             </p>
         </section>
 
-        <!-- Reservations / Geplante Ausgaben Section -->
-        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="font-bold text-base text-slate-100 flex items-center gap-2">
-                    <span>📋</span> Geplante Ausgaben
-                </h2>
-                <span class="text-xs font-semibold text-emerald-400" id="reservedSumDisplay">0,00 €</span>
-            </div>
-
-            <!-- Reservations Input Form (single line) -->
-            <form id="reservationForm" onsubmit="handleAddReservation(event)" class="space-y-3 mb-4 pb-4 border-b border-slate-700/50">
-                <div class="flex gap-2">
-                    <input type="text" id="reservationLabel" placeholder="z.B. Tabak, Arzt..."
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
-                    <input type="text" id="reservationAmount" inputmode="decimal" placeholder="10,00"
-                        class="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
-                    <select id="reservationCategory" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500">
-                        <option value="">Kategorie</option>
-                        <option value="Haushalt/Essen">🛒 Essen</option>
-                        <option value="Tabak">🚬 Tabak</option>
-                        <option value="Reptilien">🦎 Reptilien</option>
-                        <option value="Privatkäufe">🛍️ Privatkäufe</option>
-                        <option value="Sonstiges">📦 Sonstiges</option>
-                    </select>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all active:scale-[0.99]">
-                        Einplanen
-                    </button>
-                </div>
-            </form>
-
-            <!-- Reservations List -->
-            <div id="reservationsList" class="space-y-2">
-                <p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
-            </div>
-        </section>
-
-        <!-- B4: Quick Expense Form (moved up, before categories) -->
+        <!-- A7: Quick Expense Form (moved before reservations) -->
         <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
             <h2 class="font-bold text-base text-slate-100 mb-3 flex items-center gap-2">
                 <span>⚡</span> Ausgabe eintragen
@@ -552,6 +524,44 @@
                     Bargeld-Ausgabe buchen
                 </button>
             </form>
+        </section>
+
+        <!-- Reservations / Geplante Ausgaben Section -->
+        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                    <span>📋</span> Geplante Ausgaben
+                </h2>
+                <span class="text-xs font-semibold text-emerald-400" id="reservedSumDisplay">0,00 €</span>
+            </div>
+
+            <!-- A6: Reservations Input Form (gestapelt) -->
+            <form id="reservationForm" onsubmit="handleAddReservation(event)" class="space-y-3 mb-4 pb-4 border-b border-slate-700/50">
+                <div>
+                    <input type="text" id="reservationLabel" placeholder="z.B. Tabak, Arzt..."
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 min-h-11">
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="reservationAmount" inputmode="decimal" placeholder="10,00"
+                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 min-h-11">
+                    <select id="reservationCategory" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 min-h-11">
+                        <option value="">Kategorie</option>
+                        <option value="Haushalt/Essen">🛒 Essen</option>
+                        <option value="Tabak">🚬 Tabak</option>
+                        <option value="Reptilien">🦎 Reptilien</option>
+                        <option value="Privatkäufe">🛍️ Privatkäufe</option>
+                        <option value="Sonstiges">📦 Sonstiges</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all active:scale-[0.99] min-h-11">
+                    Einplanen
+                </button>
+            </form>
+
+            <!-- Reservations List -->
+            <div id="reservationsList" class="space-y-2">
+                <p class="text-xs text-slate-500 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
+            </div>
         </section>
 
         <!-- Category Budget Breakdown -->
@@ -642,11 +652,11 @@
             </p>
             <div class="flex gap-2 pt-2">
                 <button onclick="cancelPendingExpense()"
-                    class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                    class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
                     Kauf stoppen
                 </button>
                 <button onclick="confirmPendingExpense()"
-                    class="w-1/2 bg-amber-600 hover:bg-amber-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                    class="w-1/2 bg-transparent border border-slate-600 text-slate-300 hover:bg-slate-700 py-2.5 rounded-xl text-sm font-medium">
                     Trotzdem buchen
                 </button>
             </div>
@@ -1797,8 +1807,14 @@
             if (limit > 0 && (todaySpent + amount) > limit + 0.005) {
                 pendingExpense = { amount, category: selectedCategory, note, overBudget: 'daily' };
                 document.getElementById('warningTitle').innerText = 'Achtung: Tageslimit erreicht!';
-                document.getElementById('warningText').innerText =
-                    'Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?';
+
+                // A4: Dynamischer Text mit Zahlen
+                const overAmount = (todaySpent + amount) - limit;
+                const daysLeft = getDaysRemainingInMonth();
+                const newDailyLimit = (appState.totalCash - amount + (todaySpent + amount) - getReservedRemaining()) / daysLeft;
+                const warningText = `Das sind ${formatEuro(overAmount)} über deinem Tagesbudget. Bleiben dir für die restlichen ${daysLeft} Tage im Schnitt ${formatEuro(newDailyLimit)} pro Tag.`;
+                document.getElementById('warningText').innerText = warningText;
+
                 openModal('warningModal');
                 return;
             }
@@ -2040,13 +2056,15 @@
             const todaySpent = getTodaySpent();
             const dailyLimit = getDailyLimit();
 
-            document.getElementById('suggestedDailyDisplay').innerText = formatEuro(dailyLimit);
             document.getElementById('targetDailyDisplay').innerText = formatEuro(dailyLimit);
             document.getElementById('todaySpentDisplay').innerText = formatEuro(todaySpent);
 
-            // B3: Remaining for today
-            const todayRemaining = Math.max(0, dailyLimit - todaySpent);
-            document.getElementById('todayRemainingDisplay').innerText = formatEuro(todayRemaining);
+            // A2: Remaining for today - darf negativ werden, mit dynamischem Label und Farbe
+            const todayRemaining = dailyLimit - todaySpent;
+            const isNegative = todayRemaining < 0;
+            document.getElementById('todayRemainingLabel').innerText = isNegative ? 'Über Ziel' : 'Verbleibend heute';
+            document.getElementById('todayRemainingDisplay').innerText = formatEuro(isNegative ? -todayRemaining : todayRemaining);
+            document.getElementById('todayRemainingDisplay').style.color = isNegative ? '#f87171' : '#10b981';
 
             // Reservations sum display
             document.getElementById('reservedSumDisplay').innerText = formatEuro(reservedRemaining);
@@ -2066,6 +2084,18 @@
             const progressBar = document.getElementById('dailyProgressBar');
 
             const shortfall = getReservationShortfall();
+
+            // A1: Leerzustand – kein roter Alarm beim ersten Start
+            if (appState.transactions.length === 0) {
+                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700";
+                dot.className = "w-3.5 h-3.5 rounded-full bg-slate-500 inline-block shadow-sm";
+                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700/50 text-slate-300 border border-slate-600";
+                badge.innerText = "Noch nichts erfasst";
+                message.innerText = "Trage zuerst ein, wie viel Bargeld du hast.";
+                progressBar.style.width = "0%";
+                progressBar.className = "bg-slate-500 h-full rounded-full transition-all duration-500";
+                return;
+            }
 
             // B3: Reservation shortfall – geplante Ausgaben übersteigen Bargeld
             if (shortfall > 0) {
