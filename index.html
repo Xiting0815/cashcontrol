@@ -556,9 +556,14 @@
 
         <!-- Category Budget Breakdown -->
         <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
-            <div class="flex justify-between items-center mb-3">
+            <div class="flex justify-between items-center mb-3 gap-2">
                 <h2 class="font-bold text-base text-slate-100">Ausgaben nach Kategorien</h2>
-                <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300"></select>
+                <div class="flex gap-2 items-center">
+                    <button onclick="openMonthReport(document.getElementById('categoryMonthSelect').value)" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded-lg font-medium transition-all">
+                        Details
+                    </button>
+                    <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300"></select>
+                </div>
             </div>
             <div id="categoryBreakdown" class="space-y-3"></div>
         </section>
@@ -677,6 +682,29 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Month Report Modal (B6: aria + keyboard) -->
+    <div id="monthReportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="monthReportTitle">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="modal-header" id="monthReportTitle">Monatsabschluss</h3>
+                <select id="reportMonthSelect" onchange="renderMonthReport()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300"></select>
+            </div>
+            <div id="monthReportContent" class="space-y-4 mb-4">
+                <!-- Content rendered dynamically -->
+            </div>
+            <div class="flex gap-2 pt-2 border-t border-slate-700">
+                <button type="button" onclick="closeModal('monthReportModal')"
+                    class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                    Schließen
+                </button>
+                <button type="button" onclick="shareMonthReport()"
+                    class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                    Übersicht teilen
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1291,7 +1319,7 @@
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     // Close any open modal
-                    ['incomeModal', 'warningModal', 'settingsModal', 'budgetModal'].forEach(id => {
+                    ['incomeModal', 'warningModal', 'settingsModal', 'budgetModal', 'monthReportModal'].forEach(id => {
                         const modal = document.getElementById(id);
                         if (modal && modal.classList.contains('modal--open')) {
                             closeModal(id);
@@ -1399,6 +1427,304 @@
             const [year, month] = monthStr.split('-');
             const date = new Date(parseInt(year), parseInt(month) - 1, 1);
             return date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+        }
+
+        // ---------- Month Report ----------
+        function getMonthReport(monthKey) {
+            if (!monthKey) monthKey = toLocalMonthKey(new Date());
+
+            const txs = appState.transactions.filter(tx => txLocalMonthKey(tx) === monthKey);
+
+            const totalIncome = txs
+                .filter(tx => tx.type === 'income')
+                .reduce((sum, tx) => sum + tx.amount, 0);
+
+            const totalExpense = txs
+                .filter(tx => tx.type === 'expense')
+                .reduce((sum, tx) => sum + tx.amount, 0);
+
+            const saldo = totalIncome - totalExpense;
+
+            // Expenses by category
+            const categoryMap = {};
+            CATEGORIES.forEach(c => {
+                categoryMap[c.id] = { id: c.id, label: c.label, icon: c.icon, sum: 0, items: [] };
+            });
+
+            txs.filter(tx => tx.type === 'expense').forEach(tx => {
+                const catId = (categoryMap[tx.category] !== undefined) ? tx.category : 'Sonstiges';
+                categoryMap[catId].sum += tx.amount;
+                categoryMap[catId].items.push({
+                    id: tx.id,
+                    amount: tx.amount,
+                    note: tx.note || '',
+                    date: tx.date
+                });
+            });
+
+            // Sort items within each category by date descending
+            Object.values(categoryMap).forEach(cat => {
+                cat.items.sort((a, b) => new Date(b.date) - new Date(a.date));
+            });
+
+            // Filter categories with expenses, sort by sum descending
+            const categories = Object.values(categoryMap)
+                .filter(cat => cat.sum > 0)
+                .sort((a, b) => b.sum - a.sum)
+                .map(cat => ({
+                    id: cat.id,
+                    label: cat.label,
+                    icon: cat.icon,
+                    sum: cat.sum,
+                    pct: totalExpense > 0 ? Math.round((cat.sum / totalExpense) * 100) : 0,
+                    items: cat.items
+                }));
+
+            // Income items
+            const incomeItems = txs
+                .filter(tx => tx.type === 'income')
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .map(tx => ({
+                    id: tx.id,
+                    amount: tx.amount,
+                    source: tx.source || 'Einnahme',
+                    date: tx.date
+                }));
+
+            return {
+                monthKey,
+                totalIncome,
+                totalExpense,
+                saldo,
+                txCount: txs.length,
+                categories,
+                incomeItems
+            };
+        }
+
+        function buildMonthReportText(monthKey) {
+            const report = getMonthReport(monthKey);
+            const monthLabel = formatMonthLabel(report.monthKey);
+
+            let text = `CashControl – ${monthLabel}\n\n`;
+
+            text += `Eingenommen:  ${formatEuro(report.totalIncome)}\n`;
+            text += `Ausgegeben:   ${formatEuro(report.totalExpense)}\n`;
+
+            const salSign = report.saldo >= 0 ? '+' : '';
+            text += `Differenz:    ${salSign}${formatEuro(report.saldo)}\n\n`;
+
+            text += `AUSGABEN NACH KATEGORIEN\n\n`;
+
+            if (report.categories.length === 0) {
+                text += `Keine Ausgaben in diesem Monat.\n\n`;
+            } else {
+                report.categories.forEach(cat => {
+                    text += `${cat.icon} ${cat.label} — ${formatEuro(cat.sum)} (${cat.pct}%)\n`;
+                    cat.items.forEach(item => {
+                        const date = new Date(item.date);
+                        const dd = String(date.getDate()).padStart(2, '0');
+                        const mm = String(date.getMonth() + 1).padStart(2, '0');
+                        const dateStr = `${dd}.${mm}.`;
+                        const noteStr = item.note ? ` ${item.note}` : '';
+                        text += `   ${dateStr} ${noteStr} — ${formatEuro(item.amount)}\n`;
+                    });
+                    text += '\n';
+                });
+            }
+
+            text += `EINNAHMEN\n\n`;
+
+            if (report.incomeItems.length === 0) {
+                text += `Keine Einnahmen in diesem Monat.\n`;
+            } else {
+                report.incomeItems.forEach(item => {
+                    const date = new Date(item.date);
+                    const dd = String(date.getDate()).padStart(2, '0');
+                    const mm = String(date.getMonth() + 1).padStart(2, '0');
+                    const dateStr = `${dd}.${mm}.`;
+                    text += `   ${dateStr}  ${item.source} — ${formatEuro(item.amount)}\n`;
+                });
+            }
+
+            return text;
+        }
+
+        function shareMonthReport() {
+            const select = document.getElementById('reportMonthSelect');
+            const monthKey = select.value;
+            const text = buildMonthReportText(monthKey);
+
+            if (navigator.share) {
+                const monthLabel = formatMonthLabel(monthKey);
+                navigator.share({
+                    title: `CashControl – ${monthLabel}`,
+                    text: text
+                }).catch(() => {
+                    // Fehler still abfangen
+                });
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('Übersicht in die Zwischenablage kopiert.');
+                }).catch(() => {
+                    downloadReportText(text, monthKey);
+                });
+            } else {
+                downloadReportText(text, monthKey);
+            }
+        }
+
+        function downloadReportText(text, monthKey) {
+            const blob = new Blob([text], { type: 'text/plain' });
+            const [year, month] = monthKey.split('-');
+            const fileName = `cashcontrol-report-${year}-${month}.txt`;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Übersicht heruntergeladen.');
+        }
+
+        function openMonthReport(monthKey) {
+            if (!monthKey) monthKey = toLocalMonthKey(new Date());
+            const select = document.getElementById('reportMonthSelect');
+
+            // Populate the select if not already done
+            if (select.options.length === 0) {
+                const months = getAvailableMonths();
+                select.innerHTML = months.map(m => `<option value="${m}">${formatMonthLabel(m)}</option>`).join('');
+            }
+
+            select.value = monthKey;
+            renderMonthReport();
+            openModal('monthReportModal');
+        }
+
+        function renderMonthReport() {
+            const select = document.getElementById('reportMonthSelect');
+            const monthKey = select.value;
+            const report = getMonthReport(monthKey);
+            const container = document.getElementById('monthReportContent');
+
+            if (report.txCount === 0) {
+                container.innerHTML = `
+                    <p class="text-xs text-slate-500 text-center py-6">In diesem Monat gibt es keine Buchungen.</p>
+                `;
+                return;
+            }
+
+            let html = '';
+
+            // Summen-Block
+            html += `
+                <div class="space-y-2 mb-4 pb-4 border-b border-slate-700">
+                    <div class="flex justify-between">
+                        <span class="text-xs text-slate-400">Eingenommen:</span>
+                        <span class="text-sm font-semibold text-emerald-400">${formatEuro(report.totalIncome)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-xs text-slate-400">Ausgegeben:</span>
+                        <span class="text-sm font-semibold text-red-400">${formatEuro(report.totalExpense)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-xs text-slate-400">Differenz:</span>
+                        <span class="text-sm font-semibold ${report.saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}">
+                            ${report.saldo >= 0 ? '+' : ''}${formatEuro(report.saldo)}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            // Kategorien
+            if (report.categories.length > 0) {
+                html += `<div class="space-y-3 mb-4 pb-4 border-b border-slate-700">`;
+                report.categories.forEach(cat => {
+                    const catId = escapeAttr(cat.id);
+                    html += `
+                        <div class="border border-slate-700 rounded-lg overflow-hidden">
+                            <button type="button" class="w-full text-left px-3 py-2.5 bg-slate-900/40 hover:bg-slate-900/60 transition-colors category-toggle" data-cat="${catId}">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span>${cat.icon}</span>
+                                        <span class="text-xs font-medium text-slate-300 truncate">${escapeHtml(cat.label)}</span>
+                                    </div>
+                                    <div class="flex items-center gap-3 shrink-0">
+                                        <span class="text-xs font-semibold text-slate-400">${formatEuro(cat.sum)} (${cat.pct}%)</span>
+                                        <span class="text-xs text-slate-600">▼</span>
+                                    </div>
+                                </div>
+                                <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden">
+                                    <div class="bg-emerald-500 h-full" style="width: ${cat.pct}%"></div>
+                                </div>
+                            </button>
+                            <div class="category-items hidden px-3 py-2.5 bg-slate-950/50 space-y-1.5 text-xs" data-cat="${catId}">
+                    `;
+                    cat.items.forEach(item => {
+                        const date = new Date(item.date);
+                        const dd = String(date.getDate()).padStart(2, '0');
+                        const mm = String(date.getMonth() + 1).padStart(2, '0');
+                        const dateStr = `${dd}.${mm}.`;
+                        const noteStr = item.note ? ` – ${escapeHtml(item.note)}` : '';
+                        html += `
+                            <div class="flex justify-between">
+                                <span class="text-slate-400">${dateStr}${noteStr}</span>
+                                <span class="text-slate-300 font-medium">${formatEuro(item.amount)}</span>
+                            </div>
+                        `;
+                    });
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Einnahmen
+            if (report.incomeItems.length > 0) {
+                html += `
+                    <div class="space-y-2 mb-4 pb-4 border-b border-slate-700">
+                        <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Einnahmen</h3>
+                `;
+                report.incomeItems.forEach(item => {
+                    const date = new Date(item.date);
+                    const dd = String(date.getDate()).padStart(2, '0');
+                    const mm = String(date.getMonth() + 1).padStart(2, '0');
+                    const dateStr = `${dd}.${mm}.`;
+                    html += `
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">${dateStr}  ${escapeHtml(item.source)}</span>
+                            <span class="text-emerald-400 font-medium">${formatEuro(item.amount)}</span>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+
+            // Delegierter Listener für Kategorien
+            if (!container._categoryToggleListener) {
+                container.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.category-toggle');
+                    if (btn) {
+                        const catId = btn.dataset.cat;
+                        const items = container.querySelector(`[data-cat="${escapeAttr(catId)}"].category-items`);
+                        if (items) {
+                            items.classList.toggle('hidden');
+                            const arrow = btn.querySelector('.text-xs.text-slate-600');
+                            if (arrow) {
+                                arrow.textContent = items.classList.contains('hidden') ? '▼' : '▲';
+                            }
+                        }
+                    }
+                });
+                container._categoryToggleListener = true;
+            }
         }
 
         function getExpensesByCategoryForMonth(monthStr) {
@@ -1956,6 +2282,13 @@
         function renderSettingsSheet() {
             const content = document.getElementById('settingsSheetContent');
             let html = '';
+
+            // Month Report
+            html += `
+                <button class="settings-sheet-item" onclick="openMonthReport(); closeModal('settingsModal');">
+                    Monatsabschluss
+                </button>
+            `;
 
             // Standard options
             html += `
