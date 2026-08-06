@@ -510,18 +510,24 @@
 
         // ---------- A6: Backup-Validierung ----------
         function validateBackup(obj) {
-            if (!obj) return { ok: false, data: null, error: 'Datei ist leer', skipped: 0 };
+            if (!obj) return { ok: false, data: null, error: 'Datei ist leer', skipped: 0, budgets: null, settings: null };
 
             let transactions = [];
             let skipped = 0;
+            let budgets = null;
+            let settings = null;
 
             // Akzeptiere sowohl neue Hülle als auch v2-Rohformat
             if (obj.app === 'cashcontrol' && obj.data && Array.isArray(obj.data.transactions)) {
                 transactions = obj.data.transactions;
+                budgets = obj.data.budgets || null;
+                settings = obj.data.settings || null;
             } else if (Array.isArray(obj.transactions)) {
                 transactions = obj.transactions;
+                budgets = obj.budgets || null;
+                settings = obj.settings || null;
             } else {
-                return { ok: false, data: null, error: 'Keine Transaktionen gefunden', skipped: 0 };
+                return { ok: false, data: null, error: 'Keine Transaktionen gefunden', skipped: 0, budgets: null, settings: null };
             }
 
             const validTransactions = [];
@@ -551,7 +557,9 @@
                 ok: true,
                 data: validTransactions,
                 error: null,
-                skipped: skipped
+                skipped: skipped,
+                budgets: budgets,
+                settings: settings
             };
         }
 
@@ -883,7 +891,7 @@
 
         function renderCategoryBreakdown() {
             const container = document.getElementById('categoryBreakdown');
-            const selectedMonth = document.getElementById('categoryMonthSelect').value || new Date().toISOString().substring(0, 7);
+            const selectedMonth = document.getElementById('categoryMonthSelect').value || toLocalMonthKey(new Date());
             const monthlyData = getExpensesByCategoryForMonth(selectedMonth);
 
             const totalSpentMonth = Object.values(monthlyData).reduce((a, b) => a + b, 0);
