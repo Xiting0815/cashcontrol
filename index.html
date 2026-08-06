@@ -412,6 +412,16 @@
         .more-btn:hover {
             background-color: #475569;
         }
+
+        .deleteBtn,
+        .reservationDoneBtn,
+        .reservationDeleteBtn {
+            min-width: 44px;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -1406,8 +1416,13 @@
         function setupModalKeyboard() {
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
+                    const warningModal = document.getElementById('warningModal');
+                    if (warningModal && warningModal.classList.contains('modal--open')) {
+                        cancelPendingExpense();
+                        return;
+                    }
                     // Close any open modal
-                    ['incomeModal', 'warningModal', 'settingsModal', 'budgetModal', 'monthReportModal'].forEach(id => {
+                    ['incomeModal', 'settingsModal', 'budgetModal', 'monthReportModal'].forEach(id => {
                         const modal = document.getElementById(id);
                         if (modal && modal.classList.contains('modal--open')) {
                             closeModal(id);
@@ -1421,7 +1436,11 @@
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) {
                         const id = modal.id;
-                        closeModal(id);
+                        if (id === 'warningModal') {
+                            cancelPendingExpense();
+                        } else {
+                            closeModal(id);
+                        }
                     }
                 });
             });
@@ -1899,9 +1918,9 @@
                 // A4: Dynamischer Text mit Zahlen
                 const overAmount = (todaySpent + amount) - limit;
                 const daysLeft = getDaysRemainingInMonth();
-                const newDailyLimit = (appState.totalCash - amount + (todaySpent + amount) - getReservedRemaining()) / daysLeft;
-                const warningText = `Das sind ${formatEuro(overAmount)} über deinem Tagesbudget. Bleiben dir für die restlichen ${daysLeft} Tage im Schnitt ${formatEuro(newDailyLimit)} pro Tag.`;
-                document.getElementById('warningText').innerText = warningText;
+                const newDailyLimit = Math.max(0, (appState.totalCash - amount - getReservedRemaining())) / Math.max(1, daysLeft - 1);
+                const warningText = `Das sind ${formatEuro(overAmount)} über deinem Tagesbudget. <span class="font-semibold text-amber-300">Bleiben dir für die restlichen ${daysLeft} Tage im Schnitt ${formatEuro(newDailyLimit)} pro Tag.</span>`;
+                document.getElementById('warningText').innerHTML = warningText;
 
                 openModal('warningModal');
                 return;
@@ -1942,6 +1961,7 @@
         function cancelPendingExpense() {
             pendingExpense = null;
             closeModal('warningModal');
+            showToast('Nicht gebucht.');
         }
 
         // ---------- Income Flow ----------
@@ -1994,6 +2014,7 @@
             if (!tx) return;
             if (!confirm('Diese Buchung wirklich löschen?')) return;
 
+            saveUndoSnapshot();
             appState.transactions = appState.transactions.filter(t => t.id !== id);
             recomputeTotalCash();
             saveToStorage();
@@ -2109,11 +2130,14 @@
             // Delegierter Listener
             if (!container._delegateListenerAdded) {
                 container.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('reservationDoneBtn')) {
-                        const id = e.target.dataset.id;
+                    const doneBtn = e.target.closest('.reservationDoneBtn');
+                    if (doneBtn) {
+                        const id = doneBtn.dataset.id;
                         toggleReservationDone(id);
-                    } else if (e.target.classList.contains('reservationDeleteBtn')) {
-                        const id = e.target.dataset.id;
+                    }
+                    const delBtn = e.target.closest('.reservationDeleteBtn');
+                    if (delBtn) {
+                        const id = delBtn.dataset.id;
                         deleteReservation(id);
                     }
                 });
@@ -2372,12 +2396,14 @@
                     const sign = isExpense ? '−' : '+';
                     const colorClass = isExpense ? 'text-red-400' : 'text-emerald-400';
                     const noteHtml = tx.note ? ' · ' + escapeHtml(tx.note) : '';
+                    const timeStr = new Date(tx.date).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
                     return `
                         <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-3 py-2.5">
                             <div class="flex items-center gap-2.5 min-w-0">
                                 <span class="text-lg leading-none">${icon}</span>
                                 <div class="min-w-0">
+                                    <div class="text-[11px] text-slate-400">${timeStr}</div>
                                     <div class="text-xs font-medium text-slate-200 truncate">${label}${noteHtml}</div>
                                 </div>
                             </div>
@@ -2398,8 +2424,9 @@
             // Delegierter Listener
             if (!container._delegateListenerAdded) {
                 container.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('deleteBtn')) {
-                        const id = e.target.dataset.id;
+                    const btn = e.target.closest('.deleteBtn');
+                    if (btn) {
+                        const id = btn.dataset.id;
                         deleteTransaction(id);
                     }
                 });
