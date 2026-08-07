@@ -459,8 +459,13 @@
             </div>
             <div class="text-2xl font-extrabold tracking-tight mb-4" id="totalCashDisplay" style="color: #10b981;">0,00 €</div>
 
-            <div class="pt-3 border-t border-slate-700/50 text-xs text-slate-400">
-                <span>Verbleibende Tage: <strong class="text-slate-200" id="daysLeftDisplay">--</strong></span>
+            <div class="pt-3 border-t border-slate-700/50 space-y-1.5 text-xs text-slate-400">
+                <div>
+                    <span>Bis zum Geld: <strong class="text-slate-200" id="daysUntilMoneyDisplay">--</strong></span> Tage
+                </div>
+                <div id="runwayDisplay" class="text-slate-400">
+                    Noch keine Ausgaben erfasst
+                </div>
             </div>
 
             <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
@@ -687,6 +692,41 @@
         </div>
     </div>
 
+    <!-- Payday & Stretch Modal (B6: aria + keyboard) -->
+    <div id="paydayModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="paydayModalTitle">
+        <div class="modal-content">
+            <h3 class="modal-header" id="paydayModalTitle">Geldeingang & Zeitraum</h3>
+            <form id="paydayForm" onsubmit="savePaydaySettings(event)" class="space-y-3">
+                <div>
+                    <label for="paydayInput" class="block text-xs font-medium text-slate-400 mb-1">Mein Geld kommt am … des Monats</label>
+                    <input type="number" id="paydayInput" min="1" max="28" required
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="stretchInput" class="block text-xs font-medium text-slate-400">Ich strecke bis … (optional)</label>
+                        <button type="button" onclick="resetStretchDate()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-all">
+                            Zurücksetzen
+                        </button>
+                    </div>
+                    <input type="date" id="stretchInput"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">Dein Tagesbudget wird auf die Tage bis dahin verteilt.</p>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeModal('paydayModal')"
+                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                        Abbrechen
+                    </button>
+                    <button type="submit"
+                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                        Speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- B7: Budget Modal (B6: aria + keyboard) -->
     <div id="budgetModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle">
         <div class="modal-content">
@@ -741,9 +781,9 @@
         let appState = {
             totalCash: 0,
             transactions: [],
-            schemaVersion: 4,
+            schemaVersion: 5,
             budgets: {},
-            settings: { lastBackupAt: null, backupReminderDays: 14 },
+            settings: { lastBackupAt: null, backupReminderDays: 14, paydayDay: 1, stretchUntil: null },
             reservations: []
         };
 
@@ -902,7 +942,7 @@
 
         // ---------- A4: Migration ----------
         function migrateState() {
-            if (!appState.schemaVersion) appState.schemaVersion = 4;
+            if (!appState.schemaVersion) appState.schemaVersion = 5;
             if (!appState.budgets) {
                 appState.budgets = {};
                 CATEGORIES.forEach(c => {
@@ -912,8 +952,18 @@
             if (!appState.settings) {
                 appState.settings = {
                     lastBackupAt: null,
-                    backupReminderDays: 14
+                    backupReminderDays: 14,
+                    paydayDay: 1,
+                    stretchUntil: null
                 };
+            } else {
+                // Für Schema-Upgrades: fehlende Felder ergänzen
+                if (appState.settings.paydayDay === undefined) {
+                    appState.settings.paydayDay = 1;
+                }
+                if (appState.settings.stretchUntil === undefined) {
+                    appState.settings.stretchUntil = null;
+                }
             }
             if (!appState.transactions) appState.transactions = [];
             if (!appState.reservations) appState.reservations = [];
@@ -1020,9 +1070,9 @@
                 appState = {
                     totalCash: 0,
                     transactions: [],
-                    schemaVersion: 4,
+                    schemaVersion: 5,
                     budgets: {},
-                    settings: { lastBackupAt: null, backupReminderDays: 14 },
+                    settings: { lastBackupAt: null, backupReminderDays: 14, paydayDay: 1, stretchUntil: null },
                     reservations: []
                 };
                 CATEGORIES.forEach(c => { appState.budgets[c.id] = 0; });
@@ -1045,7 +1095,7 @@
         function exportBackup() {
             const backup = {
                 app: 'cashcontrol',
-                schemaVersion: 4,
+                schemaVersion: 5,
                 exportedAt: new Date().toISOString(),
                 data: appState
             };
@@ -1230,7 +1280,29 @@
             }
 
             if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
-                // settings ist ein gültiges Objekt
+                // Validiere paydayDay (1-28) und stretchUntil (null oder YYYY-MM-DD)
+                if (settings.paydayDay !== undefined) {
+                    const pd = parseInt(settings.paydayDay, 10);
+                    if (!isFinite(pd) || pd < 1 || pd > 28) {
+                        settings.paydayDay = 1;
+                    } else {
+                        settings.paydayDay = pd;
+                    }
+                } else {
+                    settings.paydayDay = 1;
+                }
+
+                if (settings.stretchUntil !== undefined && settings.stretchUntil !== null) {
+                    const su = String(settings.stretchUntil).trim();
+                    const d = new Date(su);
+                    if (isNaN(d.getTime())) {
+                        settings.stretchUntil = null;
+                    } else {
+                        settings.stretchUntil = su;
+                    }
+                } else {
+                    settings.stretchUntil = null;
+                }
             } else {
                 settings = null;
             }
@@ -1422,7 +1494,7 @@
                         return;
                     }
                     // Close any open modal
-                    ['incomeModal', 'settingsModal', 'budgetModal', 'monthReportModal'].forEach(id => {
+                    ['incomeModal', 'settingsModal', 'budgetModal', 'monthReportModal', 'paydayModal'].forEach(id => {
                         const modal = document.getElementById(id);
                         if (modal && modal.classList.contains('modal--open')) {
                             closeModal(id);
@@ -1460,6 +1532,68 @@
             const totalDays = getDaysInCurrentMonth();
             const currentDay = now.getDate();
             return (totalDays - currentDay) + 1;
+        }
+
+        // ---------- Horizon Functions ----------
+        function getHorizonDate() {
+            const now = new Date();
+            const today = toLocalDateKey(now);
+
+            // Wenn stretchUntil gesetzt und in der Zukunft liegt, nutze es
+            if (appState.settings.stretchUntil) {
+                const stretchDate = new Date(appState.settings.stretchUntil);
+                const stretchKey = toLocalDateKey(stretchDate);
+                if (stretchKey > today) {
+                    return stretchDate;
+                }
+            }
+
+            // Sonst: nächstes Vorkommen von paydayDay nach heute
+            const paydayDay = Math.max(1, Math.min(28, appState.settings.paydayDay || 1));
+            let year = now.getFullYear();
+            let month = now.getMonth();
+            let day = paydayDay;
+
+            // Prüfe, ob paydayDay im aktuellen Monat noch bevorsteht
+            const lastDayOfCurrentMonth = new Date(year, month + 1, 0).getDate();
+            if (day > lastDayOfCurrentMonth) {
+                day = lastDayOfCurrentMonth;
+            }
+
+            let candidate = new Date(year, month, day, 0, 0, 0, 0);
+            const candidateKey = toLocalDateKey(candidate);
+
+            if (candidateKey > today) {
+                return candidate;
+            }
+
+            // Sonst nächsten Monat
+            month++;
+            if (month > 11) {
+                month = 0;
+                year++;
+            }
+            const lastDayOfNextMonth = new Date(year, month + 1, 0).getDate();
+            day = Math.min(paydayDay, lastDayOfNextMonth);
+            return new Date(year, month, day, 0, 0, 0, 0);
+        }
+
+        function getDaysUntilHorizon() {
+            const now = new Date();
+            const today = toLocalDateKey(now);
+            const horizon = getHorizonDate();
+            const horizonKey = toLocalDateKey(horizon);
+
+            // Berechne ganze Tage von heute (einschließlich) bis Horizont (ausschließlich)
+            let dayCount = 0;
+            let current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+            while (toLocalDateKey(current) < horizonKey) {
+                dayCount++;
+                current.setDate(current.getDate() + 1);
+            }
+
+            return Math.max(1, dayCount);
         }
 
         function getTodaySpent() {
@@ -1513,9 +1647,47 @@
         }
 
         function getDailyLimit() {
-            const days = Math.max(1, getDaysRemainingInMonth());
+            const days = Math.max(1, getDaysUntilHorizon());
             const verfuegbar = appState.totalCash + getTodaySpent() - getReservedRemaining();
             return Math.max(0, verfuegbar) / days;
+        }
+
+        function getAverageDailySpend(tage = 7) {
+            const now = new Date();
+            const expenses = [];
+
+            // Sammle alle Ausgaben der letzten `tage` Kalendertage
+            for (let i = 0; i < tage; i++) {
+                const checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+                const dateKey = toLocalDateKey(checkDate);
+
+                const daySpent = appState.transactions
+                    .filter(tx => tx.type === 'expense' && txLocalDateKey(tx) === dateKey)
+                    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
+                if (daySpent > 0) {
+                    expenses.push(daySpent);
+                }
+            }
+
+            if (expenses.length === 0) return 0;
+            const total = expenses.reduce((sum, x) => sum + x, 0);
+            return total / tage;
+        }
+
+        function getRunwayDays() {
+            const avgSpend = getAverageDailySpend(7);
+            if (avgSpend <= 0) return null;
+            return Math.floor(appState.totalCash / avgSpend);
+        }
+
+        function getRunwayDate() {
+            const days = getRunwayDays();
+            if (days === null) return null;
+
+            const now = new Date();
+            const runway = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+            return runway;
         }
 
         function getAvailableMonths() {
@@ -1917,7 +2089,7 @@
 
                 // A4: Dynamischer Text mit Zahlen
                 const overAmount = (todaySpent + amount) - limit;
-                const daysLeft = getDaysRemainingInMonth();
+                const daysLeft = getDaysUntilHorizon();
                 const newDailyLimit = Math.max(0, (appState.totalCash - amount - getReservedRemaining())) / Math.max(1, daysLeft - 1);
                 const warningText = `Das sind ${formatEuro(overAmount)} über deinem Tagesbudget. <span class="font-semibold text-amber-300">Bleiben dir für die restlichen ${daysLeft} Tage im Schnitt ${formatEuro(newDailyLimit)} pro Tag.</span>`;
                 document.getElementById('warningText').innerHTML = warningText;
@@ -2175,8 +2347,40 @@
                 reservationInfoEl.classList.add('hidden');
             }
 
-            const daysRemaining = getDaysRemainingInMonth();
-            document.getElementById('daysLeftDisplay').innerText = daysRemaining;
+            const daysUntilHorizon = getDaysUntilHorizon();
+            document.getElementById('daysUntilMoneyDisplay').innerText = daysUntilHorizon;
+
+            // Runway display
+            const runwayDisplay = document.getElementById('runwayDisplay');
+            const runwayDate = getRunwayDate();
+            const avgSpend = getAverageDailySpend(7);
+
+            if (avgSpend === 0) {
+                runwayDisplay.innerText = 'Noch keine Ausgaben erfasst';
+                runwayDisplay.className = 'text-slate-400';
+            } else if (runwayDate) {
+                const dd = String(runwayDate.getDate()).padStart(2, '0');
+                const mm = String(runwayDate.getMonth() + 1).padStart(2, '0');
+                const dateStr = `${dd}.${mm}.`;
+                const horizonDate = getHorizonDate();
+                const horizonKey = toLocalDateKey(horizonDate);
+                const runwayKey = toLocalDateKey(runwayDate);
+
+                const shortfall = horizonKey > runwayKey ? (Math.floor((new Date(horizonKey) - new Date(runwayKey)) / (1000 * 60 * 60 * 24))) : 0;
+
+                if (runwayKey < horizonKey) {
+                    // Runway vor Horizont: rot
+                    runwayDisplay.innerHTML = `Reicht bei deinem Schnitt bis ~${dateStr} — das sind ${shortfall} Tage zu früh`;
+                    runwayDisplay.className = 'text-red-400';
+                } else {
+                    // Runway nach oder gleich Horizont: grau
+                    runwayDisplay.innerHTML = `Reicht bei deinem Schnitt bis ~${dateStr}`;
+                    runwayDisplay.className = 'text-slate-400';
+                }
+            } else {
+                runwayDisplay.innerText = 'Noch keine Ausgaben erfasst';
+                runwayDisplay.className = 'text-slate-400';
+            }
 
             const todaySpent = getTodaySpent();
             const dailyLimit = getDailyLimit();
@@ -2440,9 +2644,57 @@
             openModal('settingsModal');
         }
 
+        function openPaydayModal() {
+            document.getElementById('paydayInput').value = appState.settings.paydayDay || 1;
+            document.getElementById('stretchInput').value = appState.settings.stretchUntil || '';
+            openModal('paydayModal');
+        }
+
+        function resetStretchDate() {
+            document.getElementById('stretchInput').value = '';
+        }
+
+        function savePaydaySettings(event) {
+            event.preventDefault();
+            const paydayDay = parseInt(document.getElementById('paydayInput').value, 10);
+            const stretchUntil = document.getElementById('stretchInput').value || null;
+
+            // Validiere paydayDay
+            if (!isFinite(paydayDay) || paydayDay < 1 || paydayDay > 28) {
+                showToast('Ungültiges Datum. Bitte wähle einen Tag zwischen 1 und 28.');
+                return;
+            }
+
+            appState.settings.paydayDay = paydayDay;
+
+            // Validiere stretchUntil wenn gesetzt
+            if (stretchUntil) {
+                const stretchDate = new Date(stretchUntil);
+                if (isNaN(stretchDate.getTime())) {
+                    showToast('Ungültiges Stretchdatum.');
+                    return;
+                }
+                appState.settings.stretchUntil = stretchUntil;
+            } else {
+                appState.settings.stretchUntil = null;
+            }
+
+            saveToStorage();
+            renderUI();
+            closeModal('paydayModal');
+            showToast('Einstellungen gespeichert.');
+        }
+
         function renderSettingsSheet() {
             const content = document.getElementById('settingsSheetContent');
             let html = '';
+
+            // Geldeingang & Zeitraum (ganz oben)
+            html += `
+                <button class="settings-sheet-item" onclick="openPaydayModal();">
+                    Geldeingang & Zeitraum
+                </button>
+            `;
 
             // Month Report
             html += `
