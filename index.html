@@ -1148,6 +1148,9 @@
                     return;
                 }
 
+                if (!snap.state || typeof snap.state !== 'object' || !Array.isArray(snap.state.transactions)) {
+                    throw new Error('Snapshot unbrauchbar');
+                }
                 appState = snap.state;
                 // Snapshot kann aus einer älteren Schema-Version stammen – fehlende
                 // Felder (budgets, settings, reservations) hier ergänzen, sonst
@@ -1464,7 +1467,8 @@
                         appState.transactions = validation.data;
                         appState.budgets = validation.budgets || appState.budgets || {};
                         appState.settings = validation.settings || appState.settings || { lastBackupAt: null, backupReminderDays: 14 };
-                        appState.reservations = validation.reservations || [];
+                        // Fehlendes Feld heisst "nicht im Backup enthalten", nicht "geloescht"
+                        if (validation.reservations) appState.reservations = validation.reservations;
                     } else if (mode === 'merge') {
                         saveUndoSnapshot();
                         const merged = [...appState.transactions, ...validation.data];
@@ -1646,17 +1650,24 @@
             const now = new Date();
             const today = toLocalDateKey(now);
 
-            // Wenn stretchUntil gesetzt und in der Zukunft liegt, nutze es
-            if (appState.settings.stretchUntil) {
-                const stretchDate = new Date(appState.settings.stretchUntil);
-                const stretchKey = toLocalDateKey(stretchDate);
-                if (stretchKey > today) {
-                    return stretchDate;
+            // Zeitstempel vergleichen, nicht Datumsschlüssel als Strings: "20226-08-07"
+            // ist als String kleiner als "2026-08-07" und wäre damit wirkungslos.
+            // Zusätzlich ein Plausibilitätsdeckel – ein vertipptes Jahr hat sonst
+            // ein Tagesbudget von 1,29 € zur Folge, ohne jede Rückmeldung.
+            if (appState.settings && appState.settings.stretchUntil) {
+                const teile = String(appState.settings.stretchUntil).split('-');
+                const ziel = new Date(Number(teile[0]), Number(teile[1]) - 1, Number(teile[2]));
+                const heuteMitternacht = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const maxVorlauf = new Date(heuteMitternacht.getTime() + 92 * 86400000);
+                if (!isNaN(ziel.getTime()) && ziel > heuteMitternacht && ziel <= maxVorlauf) {
+                    return ziel;
                 }
             }
 
             // Sonst: nächstes Vorkommen von paydayDay nach heute
-            const paydayDay = Math.max(1, Math.min(28, appState.settings.paydayDay || 1));
+            let roh = Number(appState.settings && appState.settings.paydayDay);
+            if (!isFinite(roh)) roh = 1;
+            const paydayDay = Math.max(1, Math.min(28, Math.floor(roh)));
             let year = now.getFullYear();
             let month = now.getMonth();
             let day = paydayDay;
@@ -1687,20 +1698,13 @@
 
         function getDaysUntilHorizon() {
             const now = new Date();
-            const today = toLocalDateKey(now);
-            const horizon = getHorizonDate();
-            const horizonKey = toLocalDateKey(horizon);
-
-            // Berechne ganze Tage von heute (einschließlich) bis Horizont (ausschließlich)
-            let dayCount = 0;
-            let current = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-
-            while (toLocalDateKey(current) < horizonKey) {
-                dayCount++;
-                current.setDate(current.getDate() + 1);
-            }
-
-            return Math.max(1, dayCount);
+            const heute = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const ziel = getHorizonDate();
+            if (!ziel || isNaN(ziel.getTime())) return 1;
+            // Differenzrechnung statt Tagesschleife: bei einem kaputten Zieldatum lief die
+            // Schleife bis an die Date-Bereichsgrenze und fror die Oberfläche minutenlang ein.
+            const tage = Math.round((ziel.getTime() - heute.getTime()) / 86400000);
+            return Math.max(1, Math.min(400, tage));
         }
 
         function getTodaySpent() {
@@ -1917,7 +1921,10 @@
             const salSign = report.saldo >= 0 ? '+' : '';
             text += `Differenz:    ${salSign}${formatEuro(report.saldo)}\n\n`;
 
-            text += `AUSGABEN NACH KATEGORIEN\n\n`;
+            if (report.totalAdjust !== 0) {
+                text += `Korrekturen:  ${report.totalAdjust >= 0 ? '+' : '−'}${formatEuro(Math.abs(report.totalAdjust))}\n`;
+            }
+            text += `\nAUSGABEN NACH KATEGORIEN\n\n`;
 
             if (report.categories.length === 0) {
                 text += `Keine Ausgaben in diesem Monat.\n\n`;
@@ -2827,7 +2834,13 @@
         // Deshalb löst nicht mehr der Tag aus, sondern die rollende Woche.
         function getWeekSpent() {
             const jetzt = new Date();
-            const grenze = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - 6);
+            let grenze = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - 6);
+            // Nicht ueber den letzten Zahltag hinaus zurueckschauen: sonst zaehlen Ausgaben
+            // aus dem alten Geld gegen den neuen Wochentopf, und der erste Einkauf nach
+            // dem Zahltag loest sofort Alarm aus.
+            const periodenStart = new Date(getHorizonDate());
+            periodenStart.setMonth(periodenStart.getMonth() - 1);
+            if (periodenStart.getTime() > grenze.getTime()) grenze = periodenStart;
             return appState.transactions
                 .filter(tx => tx.type === 'expense' && new Date(tx.date) >= grenze)
                 .reduce((summe, tx) => summe + (Number(tx.amount) || 0), 0);
