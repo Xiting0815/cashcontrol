@@ -2136,15 +2136,19 @@
             const todaySpent = getTodaySpent();
             const limit = getDailyLimit();
 
-            if (limit > 0 && (todaySpent + amount) > limit + 0.005) {
-                pendingExpense = { amount, category: selectedCategory, note, overBudget: 'daily' };
-                document.getElementById('warningTitle').innerText = 'Achtung: Tagesbudget erreicht!';
+            // Auslöser ist der Wochentopf, nicht der Tag – sonst warnt die App bei
+            // jedem Wocheneinkauf und trainiert das Wegklicken an.
+            const wochenTopf = getWeeklyBudget();
+            const wocheAusgegeben = getWeekSpent();
 
-                // A4: Dynamischer Text mit Zahlen
-                const overAmount = (todaySpent + amount) - limit;
+            if (wochenTopf > 0 && (wocheAusgegeben + amount) > wochenTopf + 0.005) {
+                pendingExpense = { amount, category: selectedCategory, note, overBudget: 'weekly' };
+                document.getElementById('warningTitle').innerText = 'Das sprengt die Woche';
+
+                const ueber = (wocheAusgegeben + amount) - wochenTopf;
                 const daysLeft = getDaysUntilHorizon();
                 const newDailyLimit = Math.max(0, (appState.totalCash - amount - getReservedRemaining())) / Math.max(1, daysLeft - 1);
-                const warningText = `Das sind ${formatEuro(overAmount)} über deinem Tagesbudget. <span class="font-semibold text-amber-300">Bleiben dir für die restlichen ${daysLeft} Tage im Schnitt ${formatEuro(newDailyLimit)} pro Tag.</span>`;
+                const warningText = `${formatEuro(ueber)} über dem, was diese Woche vorgesehen war. <span class="font-semibold text-amber-300">Bis zum Geld bleiben dir dann ${formatEuro(newDailyLimit)} pro Tag für ${daysLeft - 1} Tage.</span>`;
                 document.getElementById('warningText').innerHTML = warningText;
 
                 openModal('warningModal');
@@ -2481,11 +2485,11 @@
 
             // B3: Reservation shortfall – geplante Ausgaben übersteigen Bargeld
             if (shortfall > 0) {
-                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/20 border-red-500/50";
+                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/50 border-red-500/70 ring-2 ring-red-500/25";
                 dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
-                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
-                badge.innerText = "Unterdeckung!";
-                message.innerText = `Deine geplanten Ausgaben übersteigen dein Bargeld um ${formatEuro(shortfall)}. Heute: 0,00 € verfügbar.`;
+                badge.className = "text-sm font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/30";
+                badge.innerText = "Unterdeckung";
+                message.innerText = `Deine geplanten Ausgaben übersteigen dein Bargeld um ${formatEuro(shortfall)}.`;
                 progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
                 progressBar.style.width = "100%";
                 return;
@@ -2493,11 +2497,11 @@
 
             // B3: Bei Bestand ≤ 0
             if (totalCash <= 0) {
-                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/20 border-red-500/50";
+                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/50 border-red-500/70 ring-2 ring-red-500/25";
                 dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
-                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
-                badge.innerText = "Kein Bargeld mehr";
-                message.innerText = "Dein Bargeldbestand ist aufgebraucht – heute nichts mehr ausgeben.";
+                badge.className = "text-sm font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/30";
+                badge.innerText = "Kein Bargeld";
+                message.innerText = `Bestand 0,00 €. Bis zum Geld sind es noch ${getDaysUntilHorizon()} Tage.`;
                 progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
                 progressBar.style.width = "100%";
                 return;
@@ -2508,29 +2512,62 @@
 
             progressBar.style.width = pct + '%';
             progressBar.setAttribute('aria-valuenow', pct);
-            statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 ";
 
+            const flug = getTrajectory();
+            const restHeute = limit - spent;
+            const tagessatzDanach = Math.max(0, appState.totalCash - getReservedRemaining()) / Math.max(1, getDaysUntilHorizon());
+
+            // Die Flugbahn schlägt den Tagesstand: Wer heute nichts ausgegeben hat, aber
+            // erkennbar nicht bis zum Zahltag kommt, darf keine grüne Karte sehen.
+            if (flug.status === 'kritisch') {
+                setStatus('warn', 'Geld wird knapp',
+                    `Bei deinem Schnitt von ${formatEuro(flug.schnitt)} pro Tag reicht das Bargeld noch ${flug.reichweite} Tage – bis zum Geld sind es ${flug.tage}.`);
+                return;
+            }
             if (spent > limit && limit > 0) {
-                statusCard.classList.add('border-red-500/50', 'bg-red-950/20');
-                dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
-                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
-                badge.innerText = "Limit überschritten!";
-                message.innerText = "Achtung: Du hast dein Tagesbudget überschritten. Stopper einlegen: Brauchst du weitere Käufe heute wirklich?";
-                progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
-            } else if (ratio >= 0.75) {
-                statusCard.classList.add('border-amber-500/50', 'bg-amber-950/20');
-                dot.className = "w-3.5 h-3.5 rounded-full bg-amber-500 inline-block shadow-sm";
-                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                badge.innerText = "Warnung: Fast am Limit";
-                message.innerText = "Du näherst dich deinem Tagesbudget. Halte inne und vermeide weitere spontane Ausgaben.";
-                progressBar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
-            } else {
-                statusCard.classList.add('border-slate-700');
-                dot.className = "w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm";
-                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-                badge.innerText = "Im grünen Bereich";
-                message.innerText = "Gutes Haushalten! Du bist voll auf Kurs mit deinem Bargeld-Budget.";
-                progressBar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
+                setStatus('warn', 'Über dem Tagessatz',
+                    `${formatEuro(spent - limit)} über dem Tagessatz. Bis zum Geld bleiben dann ${formatEuro(tagessatzDanach)} pro Tag.`);
+                return;
+            }
+            if (flug.status === 'knapp') {
+                setStatus('warn', 'Wird knapp',
+                    `Das Bargeld reicht bei deinem Schnitt noch ${flug.reichweite} Tage, bis zum Geld sind es ${flug.tage}.`);
+                return;
+            }
+            if (ratio >= 0.75) {
+                setStatus('warn', 'Fast am Tagessatz',
+                    `Noch ${formatEuro(Math.max(0, restHeute))} für heute.`);
+                return;
+            }
+            setStatus('ok', 'Im Rahmen',
+                flug.status === 'unbekannt'
+                    ? `Noch ${formatEuro(Math.max(0, restHeute))} für heute.`
+                    : `Noch ${formatEuro(Math.max(0, restHeute))} für heute. Das Bargeld reicht bei deinem Schnitt ${flug.reichweite} Tage.`);
+
+            // Feste Klassenketten statt interpolierter Farbnamen: dynamisch gebaute
+            // Tailwind-Klassen fehlen im Fallback-CSS und brechen still.
+            function setStatus(art, badgeText, text) {
+                const stile = {
+                    ok: {
+                        karte: "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700",
+                        punkt: "w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm",
+                        badge: "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+                        balken: "bg-emerald-500 h-full rounded-full transition-all duration-500"
+                    },
+                    warn: {
+                        karte: "border rounded-2xl p-5 shadow-lg transition-all-200 bg-amber-950/30 border-amber-500/60",
+                        punkt: "w-3.5 h-3.5 rounded-full bg-amber-400 inline-block shadow-sm",
+                        badge: "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20",
+                        balken: "bg-amber-500 h-full rounded-full transition-all duration-500"
+                    }
+                };
+                const s = stile[art] || stile.ok;
+                statusCard.className = s.karte;
+                dot.className = s.punkt;
+                badge.className = s.badge;
+                badge.innerText = badgeText;
+                message.innerText = text;
+                progressBar.className = s.balken;
             }
         }
 
@@ -2712,6 +2749,45 @@
 
         function resetStretchDate() {
             document.getElementById('stretchInput').value = '';
+        }
+
+        // ---------- Wochentopf ----------
+        // Bargeldausgaben klumpen: ein Wocheneinkauf reißt jedes Tagesmittel. Ein
+        // Warndialog, der bei normalem Einkaufen mehrmals pro Woche kommt, wird
+        // reflexhaft weggetippt und greift dann auch beim echten Impulskauf nicht mehr.
+        // Deshalb löst nicht mehr der Tag aus, sondern die rollende Woche.
+        function getWeekSpent() {
+            const jetzt = new Date();
+            const grenze = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - 6);
+            return appState.transactions
+                .filter(tx => tx.type === 'expense' && new Date(tx.date) >= grenze)
+                .reduce((summe, tx) => summe + (Number(tx.amount) || 0), 0);
+        }
+
+        function getWeeklyBudget() {
+            // Nie mehr als das, was bis zum Zahltag überhaupt zur Verfügung steht
+            const tage = Math.min(7, getDaysUntilHorizon());
+            return getDailyLimit() * tage;
+        }
+
+        // ---------- Flugbahn ----------
+        // Die Tagesampel misst nur "heute bisher gegen heute-Soll" und ist deshalb
+        // jeden Morgen grün – auch wenn das Geld erkennbar nicht bis zum Zahltag reicht.
+        // Diese Funktion beantwortet die andere Frage: reicht es bis zum nächsten Geld?
+        function getTrajectory() {
+            const tage = getDaysUntilHorizon();
+            const schnitt = getAverageDailySpend(7);
+            const verfuegbar = Math.max(0, appState.totalCash - getReservedRemaining());
+            if (schnitt <= 0) {
+                return { status: 'unbekannt', fehltage: 0, reichweite: null, schnitt: 0, tage };
+            }
+            const reichweite = Math.floor(verfuegbar / schnitt);
+            const fehltage = tage - reichweite;
+            let status;
+            if (fehltage <= 0) status = 'ok';
+            else if (fehltage <= 2) status = 'knapp';
+            else status = 'kritisch';
+            return { status, fehltage, reichweite, schnitt, tage };
         }
 
         // ---------- Kassensturz ----------
