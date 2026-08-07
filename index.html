@@ -692,6 +692,36 @@
         </div>
     </div>
 
+    <!-- Kassensturz: Bestand mit der Wirklichkeit abgleichen -->
+    <div id="cashCountModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cashCountModalTitle">
+        <div class="modal-content">
+            <h3 class="modal-header" id="cashCountModalTitle">Bargeld nachzählen</h3>
+            <form id="cashCountForm" onsubmit="saveCashCount(event)" class="space-y-3">
+                <div class="flex justify-between items-baseline">
+                    <span class="text-xs text-slate-400">Laut App</span>
+                    <span class="text-base font-bold text-slate-100" id="cashCountExpected">0,00 €</span>
+                </div>
+                <div>
+                    <label for="cashCountInput" class="block text-xs font-medium text-slate-400 mb-1">Tatsächlich gezählt (€)</label>
+                    <input type="text" id="cashCountInput" inputmode="decimal" placeholder="0,00" required
+                        oninput="updateCashCountDiff()"
+                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                </div>
+                <p id="cashCountDiff" class="text-xs text-slate-400 leading-relaxed">Trage ein, wie viel Bargeld du tatsächlich hast.</p>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeModal('cashCountModal')"
+                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
+                        Abbrechen
+                    </button>
+                    <button type="submit"
+                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
+                        Übernehmen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Payday & Stretch Modal (B6: aria + keyboard) -->
     <div id="paydayModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="paydayModalTitle">
         <div class="modal-content">
@@ -831,7 +861,11 @@
             const expenseSum = appState.transactions
                 .filter(tx => tx.type === 'expense')
                 .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-            appState.totalCash = Math.round((incomeSum - expenseSum) * 100) / 100;
+            // Kassensturz-Korrekturen tragen ein Vorzeichen und werden direkt addiert
+            const adjustSum = appState.transactions
+                .filter(tx => tx.type === 'adjust')
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+            appState.totalCash = Math.round((incomeSum - expenseSum + adjustSum) * 100) / 100;
         }
 
         // ---------- Init ----------
@@ -1224,12 +1258,17 @@
 
             const validTransactions = [];
             transactions.forEach(tx => {
-                if (tx.type !== 'income' && tx.type !== 'expense') {
+                if (tx.type !== 'income' && tx.type !== 'expense' && tx.type !== 'adjust') {
                     skipped++;
                     return;
                 }
                 const amount = parseFloat(tx.amount);
-                if (!isFinite(amount) || amount <= 0) {
+                // Kassensturz-Korrekturen dürfen negativ sein (Bestand war zu hoch),
+                // Einnahmen und Ausgaben nicht. Null ist in beiden Fällen sinnlos.
+                const betragGueltig = tx.type === 'adjust'
+                    ? (isFinite(amount) && amount !== 0)
+                    : (isFinite(amount) && amount > 0);
+                if (!betragGueltig) {
                     skipped++;
                     return;
                 }
@@ -1494,7 +1533,7 @@
                         return;
                     }
                     // Close any open modal
-                    ['incomeModal', 'settingsModal', 'budgetModal', 'monthReportModal', 'paydayModal'].forEach(id => {
+                    ['incomeModal', 'settingsModal', 'budgetModal', 'monthReportModal', 'paydayModal', 'cashCountModal'].forEach(id => {
                         const modal = document.getElementById(id);
                         if (modal && modal.classList.contains('modal--open')) {
                             closeModal(id);
@@ -1776,11 +1815,18 @@
                     date: tx.date
                 }));
 
+            // Kassensturz-Korrekturen zählen weder als Einnahme noch als Ausgabe –
+            // sie werden getrennt ausgewiesen, damit der Bestand nachvollziehbar bleibt
+            const totalAdjust = txs
+                .filter(tx => tx.type === 'adjust')
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
             return {
                 monthKey,
                 totalIncome,
                 totalExpense,
                 saldo,
+                totalAdjust: Math.round(totalAdjust * 100) / 100,
                 txCount: txs.length,
                 categories,
                 incomeItems
@@ -1923,6 +1969,13 @@
                             ${report.saldo >= 0 ? '+' : ''}${formatEuro(report.saldo)}
                         </span>
                     </div>
+                    ${report.totalAdjust !== 0 ? `
+                    <div class="flex justify-between pt-1 border-t border-slate-700/50 mt-1">
+                        <span class="text-xs text-slate-400">Korrekturen (Kassensturz):</span>
+                        <span class="text-sm font-semibold text-slate-300">
+                            ${report.totalAdjust >= 0 ? '+' : '−'}${formatEuro(Math.abs(report.totalAdjust))}
+                        </span>
+                    </div>` : ''}
                 </div>
             `;
 
@@ -2594,11 +2647,18 @@
 
                 const txHtml = grouped[dateKey].map(tx => {
                     const isExpense = tx.type === 'expense';
+                    const isAdjust = tx.type === 'adjust';
                     const cat = CATEGORIES.find(c => c.id === tx.category);
-                    const icon = escapeHtml(isExpense ? (cat ? cat.icon : '📦') : '💶');
-                    const label = escapeHtml(isExpense ? (cat ? cat.label : (tx.category || 'Unbekannt')) : (tx.source || 'Einnahme'));
-                    const sign = isExpense ? '−' : '+';
-                    const colorClass = isExpense ? 'text-red-400' : 'text-emerald-400';
+                    // Korrekturen tragen ihr Vorzeichen im Betrag, Einnahmen und Ausgaben nicht
+                    const adjustNegativ = isAdjust && Number(tx.amount) < 0;
+                    const icon = escapeHtml(isAdjust ? '⚖️' : (isExpense ? (cat ? cat.icon : '📦') : '💶'));
+                    const label = escapeHtml(isAdjust
+                        ? 'Kassensturz'
+                        : (isExpense ? (cat ? cat.label : (tx.category || 'Unbekannt')) : (tx.source || 'Einnahme')));
+                    const sign = isAdjust ? (adjustNegativ ? '−' : '+') : (isExpense ? '−' : '+');
+                    const colorClass = isAdjust
+                        ? 'text-slate-300'
+                        : (isExpense ? 'text-red-400' : 'text-emerald-400');
                     const noteHtml = tx.note ? ' · ' + escapeHtml(tx.note) : '';
                     const timeStr = new Date(tx.date).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
@@ -2612,7 +2672,7 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(tx.amount)}</span>
+                                <span class="text-sm font-bold ${colorClass}">${sign} ${formatEuro(Math.abs(Number(tx.amount) || 0))}</span>
                                 <button class="deleteBtn text-slate-400 hover:text-red-400 text-xs px-1" title="Löschen" data-id="${escapeAttr(tx.id)}" aria-label="Buchung löschen"><span aria-hidden="true">✕</span></button>
                             </div>
                         </div>
@@ -2654,6 +2714,99 @@
             document.getElementById('stretchInput').value = '';
         }
 
+        // ---------- Kassensturz ----------
+        // Der Bestand wird aus den Buchungen abgeleitet, echtes Bargeld driftet aber
+        // unvermeidlich (Pfand, Kleingeld, vergessene Kleinbeträge). Ohne einen Weg
+        // zurück zur Wahrheit wäre jede abgeleitete Zahl irgendwann wertlos.
+        function openCashCountModal() {
+            document.getElementById('cashCountExpected').innerText = formatEuro(appState.totalCash);
+            const feld = document.getElementById('cashCountInput');
+            feld.value = '';
+            updateCashCountDiff();
+            openModal('cashCountModal');
+        }
+
+        function updateCashCountDiff() {
+            const zeile = document.getElementById('cashCountDiff');
+            const eingabe = document.getElementById('cashCountInput').value;
+            if (!eingabe.trim()) {
+                zeile.innerText = 'Trage ein, wie viel Bargeld du tatsächlich hast.';
+                zeile.className = 'text-xs text-slate-400 leading-relaxed';
+                return;
+            }
+            const gezaehlt = parseAmountAllowZero(eingabe);
+            if (Number.isNaN(gezaehlt)) {
+                zeile.innerText = 'Bitte einen gültigen Betrag eingeben.';
+                zeile.className = 'text-xs text-amber-300 leading-relaxed';
+                return;
+            }
+            const diff = Math.round((gezaehlt - appState.totalCash) * 100) / 100;
+            if (diff === 0) {
+                zeile.innerText = 'Stimmt genau — es wird nichts gebucht.';
+                zeile.className = 'text-xs text-slate-400 leading-relaxed';
+            } else if (diff < 0) {
+                zeile.innerText = `${formatEuro(Math.abs(diff))} weniger als gedacht. Die Differenz wird als Korrektur gebucht.`;
+                zeile.className = 'text-xs text-red-400 leading-relaxed';
+            } else {
+                zeile.innerText = `${formatEuro(diff)} mehr als gedacht. Die Differenz wird als Korrektur gebucht.`;
+                zeile.className = 'text-xs text-emerald-400 leading-relaxed';
+            }
+        }
+
+        // parseAmount lehnt 0 ab (für Ausgaben richtig) – beim Nachzählen ist 0 ein gültiger Stand
+        function parseAmountAllowZero(str) {
+            if (typeof str !== 'string') return NaN;
+            const bereinigt = str.replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+            if (!/^\d+(\.\d{1,2})?$/.test(bereinigt)) return NaN;
+            const wert = parseFloat(bereinigt);
+            if (!isFinite(wert) || wert < 0) return NaN;
+            return Math.round(wert * 100) / 100;
+        }
+
+        function saveCashCount(event) {
+            event.preventDefault();
+            const gezaehlt = parseAmountAllowZero(document.getElementById('cashCountInput').value);
+            if (Number.isNaN(gezaehlt)) {
+                showToast('Bitte einen gültigen Betrag eingeben.');
+                document.getElementById('cashCountInput').focus();
+                return;
+            }
+            const diff = Math.round((gezaehlt - appState.totalCash) * 100) / 100;
+            appState.settings.lastCountAt = new Date().toISOString();
+
+            if (diff === 0) {
+                saveToStorage();
+                closeModal('cashCountModal');
+                showToast('Bestand stimmt.');
+                return;
+            }
+
+            saveUndoSnapshot();
+            appState.transactions.unshift({
+                id: generateId(),
+                type: 'adjust',
+                amount: diff,
+                note: 'Kassensturz',
+                date: new Date().toISOString()
+            });
+            recomputeTotalCash();
+            const gespeichert = saveToStorage();
+            populateMonthSelect();
+            renderUI();
+            closeModal('cashCountModal');
+            if (gespeichert !== false) {
+                showToast(`Bestand korrigiert auf ${formatEuro(appState.totalCash)}.`);
+            }
+        }
+
+        function getDaysSinceLastCount() {
+            const letzter = appState.settings && appState.settings.lastCountAt;
+            if (!letzter) return null;
+            const d = new Date(letzter);
+            if (isNaN(d.getTime())) return null;
+            return Math.floor((Date.now() - d.getTime()) / 86400000);
+        }
+
         function savePaydaySettings(event) {
             event.preventDefault();
             const paydayDay = parseInt(document.getElementById('paydayInput').value, 10);
@@ -2689,7 +2842,21 @@
             const content = document.getElementById('settingsSheetContent');
             let html = '';
 
-            // Geldeingang & Zeitraum (ganz oben)
+            // Kassensturz ganz oben – der Wartungsvorgang, ohne den der abgeleitete
+            // Bestand mit der Zeit von der Wirklichkeit abdriftet
+            const tageSeitZaehlung = getDaysSinceLastCount();
+            const zaehlHinweis = tageSeitZaehlung === null
+                ? 'noch nie gezählt'
+                : (tageSeitZaehlung === 0 ? 'heute gezählt'
+                    : (tageSeitZaehlung === 1 ? 'vor 1 Tag' : `vor ${tageSeitZaehlung} Tagen`));
+            html += `
+                <button class="settings-sheet-item" onclick="openCashCountModal(); closeModal('settingsModal');">
+                    Bargeld nachzählen
+                    <span class="block text-[11px] text-slate-400 font-normal">${escapeHtml(zaehlHinweis)}</span>
+                </button>
+            `;
+
+            // Geldeingang & Zeitraum
             html += `
                 <button class="settings-sheet-item" onclick="openPaydayModal();">
                     Geldeingang & Zeitraum
