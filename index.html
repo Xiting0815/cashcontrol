@@ -872,16 +872,25 @@
 
         // ---------- Init ----------
         window.addEventListener('DOMContentLoaded', () => {
-            loadFromStorage();
-            migrateLegacyStorage();
-            migrateState();
-            populateMonthSelect();
-            renderCategoryChips();
-            renderUI();
-            registerServiceWorker();
+            try {
+                loadFromStorage();
+                if (zeigeLadeFehler()) return;
+                migrateLegacyStorage();
+                migrateState();
+                populateMonthSelect();
+                renderCategoryChips();
+                renderUI();
+                updateBackupBanner();
+                handleStartAction();
+            } catch (e) {
+                // Ohne diesen Zweig zeigt die App bei defektem Zustand ihr statisches
+                // Geruest: "0,00 EUR" und "Im Rahmen" – beruhigend und komplett falsch.
+                console.error('Start fehlgeschlagen:', e);
+                ladeFehler = 'Startfehler: ' + (e && e.message ? e.message : 'unbekannt');
+                try { zeigeLadeFehler(); } catch (e2) { /* Markup unvollstaendig */ }
+            }
             setupModalKeyboard();
-            updateBackupBanner();
-            handleStartAction();
+            registerServiceWorker();
         });
 
         // Das Manifest bietet einen Homescreen-Shortcut auf "./?action=expense" an.
@@ -973,29 +982,79 @@
 
         // ---------- Storage ----------
         function saveToStorage() {
+            if (ladeFehler) {
+                showToast('Es wird nichts gespeichert, solange die alten Daten nicht lesbar sind.');
+                return false;
+            }
             try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
                 return true;
             } catch (e) {
                 console.error('Speichern fehlgeschlagen:', e);
-                showToast('Speichern fehlgeschlagen – Speicher evtl. voll.');
+                showToast('Nicht gespeichert – Speicher voll. Die Buchung wurde verworfen.');
                 return false;
             }
         }
 
+        // Eine Buchung, die nicht auf die Platte kam, darf nicht auf dem Schirm stehen
+        // bleiben: Sie wäre nach dem nächsten Start weg, ohne dass es jemand merkt.
+        function bucheMitRuecknahme(tx, erfolgsMeldung) {
+            appState.transactions.unshift(tx);
+            recomputeTotalCash();
+            if (saveToStorage() === false) {
+                appState.transactions = appState.transactions.filter(t => t !== tx);
+                recomputeTotalCash();
+                populateMonthSelect();
+                renderUI();
+                return false;
+            }
+            populateMonthSelect();
+            renderUI();
+            if (erfolgsMeldung) showToast(erfolgsMeldung);
+            return true;
+        }
+
+        // Wird gesetzt, wenn gespeicherte Daten vorliegen, aber nicht lesbar sind.
+        // Dann darf nichts mehr geschrieben werden – sonst überschreibt der erste
+        // Speichervorgang den noch rettbaren Rohstring endgültig.
+        let ladeFehler = null;
+
         function loadFromStorage() {
             const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    if (parsed && Array.isArray(parsed.transactions)) {
-                        appState = parsed;
-                        recomputeTotalCash();
-                    }
-                } catch (e) {
-                    console.error('Fehler beim Laden gespeicherter Daten:', e);
-                }
+            if (!saved) return;
+            let parsed = null;
+            try {
+                parsed = JSON.parse(saved);
+            } catch (e) {
+                console.error('Gespeicherte Daten unlesbar:', e);
+                ladeFehler = 'unlesbar';
             }
+            if (!ladeFehler && (!parsed || !Array.isArray(parsed.transactions))) {
+                ladeFehler = 'unerwartetes Format';
+            }
+            if (ladeFehler) {
+                // Rohstring sichern, damit nichts verloren geht
+                try {
+                    localStorage.setItem(STORAGE_KEY + '_rettung', saved);
+                } catch (e) { /* Speicher voll – der Originalschlüssel bleibt ohnehin unangetastet */ }
+                return;
+            }
+            appState = parsed;
+            recomputeTotalCash();
+        }
+
+        // Ein stiller Leerzustand wäre von einem echten Neuanfang nicht zu unterscheiden.
+        function zeigeLadeFehler() {
+            if (!ladeFehler) return false;
+            const karte = document.getElementById('statusCard');
+            document.getElementById('statusBadge').innerText = 'Daten nicht lesbar';
+            document.getElementById('statusBadge').className = 'text-sm font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/30';
+            document.getElementById('statusMessage').innerText =
+                'Deine gespeicherten Daten konnten nicht gelesen werden (' + ladeFehler + '). Es wird nichts überschrieben. '
+                + 'Stelle über das Menü ein Backup wieder her – deine Rohdaten liegen gesichert im Browser.';
+            karte.className = 'border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/50 border-red-500/70 ring-2 ring-red-500/25';
+            document.getElementById('trafficLightDot').className = 'w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse';
+            return true;
         }
 
         // ---------- A4: Migration ----------
@@ -1459,58 +1518,43 @@
         }
 
         // ---------- Helpers ----------
-        function parseAmount(str) {
+        // Ein einziger Parser für alle Betragsfelder. Vorher gab es zwei, die sich
+        // widersprachen: "487.50" wurde beim Buchen zu 487,50 €, beim Kassensturz aber
+        // zu 48.750 € – die Zifferntastatur legt den Punkt nahe, der Fehler ist Faktor 100.
+        // Ein zu großzügiger Parser ist hier gefährlicher als ein strenger: lieber eine
+        // Eingabe ablehnen als still den falschen Betrag buchen.
+        function parseBetrag(str, erlaubeNull) {
             if (typeof str !== 'string') return NaN;
+            let n = str.replace(/\s/g, '').replace(/€/g, '');
+            if (n.length === 0) return NaN;
 
-            // S3: Deutsche Tausendertrennung korrekt handhaben
-            let normalized = str
-                .replace(/\s/g, '')
-                .replace(/€/g, '');
+            const punkt = n.lastIndexOf('.');
+            const komma = n.lastIndexOf(',');
 
-            if (normalized.length === 0) return NaN;
-
-            const hasDot = normalized.includes('.');
-            const hasComma = normalized.includes(',');
-
-            if (hasDot && hasComma) {
-                // Punkt und Komma enthalten: Punkt ist Tausendertrenner, Komma ist Dezimal
-                normalized = normalized.replace(/\./g, '').replace(',', '.');
-            } else if (hasComma && !hasDot) {
-                // Nur Komma: könnte Dezimal oder Tausendertrenner sein
-                const dotCount = (normalized.match(/\./g) || []).length;
-                if (dotCount === 0) {
-                    // Kein Punkt, Komma könnte beides sein
-                    // Wenn Komma ist nicht Dezimal (z.B. "1.500,00" → "1500,00"),
-                    // dann Komma zu Punkt
-                    const commaIndex = normalized.lastIndexOf(',');
-                    if (commaIndex > 0) {
-                        const afterComma = normalized.slice(commaIndex + 1);
-                        if (afterComma.length <= 2) {
-                            // Komma ist wahrscheinlich Dezimalpunkt
-                            normalized = normalized.replace(',', '.');
-                        } else {
-                            // Komma ist Tausendertrenner
-                            normalized = normalized.replace(/,/g, '');
-                        }
-                    }
-                }
-            } else if (hasDot && !hasComma) {
-                // Nur Punkt: genau ein Punkt mit 1-2 Nachkommastellen = Dezimalpunkt
-                const dotIndex = normalized.indexOf('.');
-                const afterDot = normalized.slice(dotIndex + 1);
-                if (afterDot.length > 2) {
-                    // Punkt ist Tausendertrenner
-                    normalized = normalized.replace(/\./g, '');
-                }
-                // Sonst Punkt bleibt als Dezimalpunkt
+            if (punkt >= 0 && komma >= 0) {
+                // Beide vorhanden: das hintere Zeichen ist das Dezimaltrennzeichen
+                if (komma > punkt) n = n.replace(/\./g, '').replace(',', '.');
+                else n = n.replace(/,/g, '');
+            } else if (komma >= 0) {
+                // Im Deutschen ist das Komma immer das Dezimaltrennzeichen.
+                // "0,001" ist damit ein Vertipper und wird abgelehnt, nicht als 1 € gelesen.
+                n = n.replace(',', '.');
+            } else if (punkt >= 0) {
+                // Nur Punkt: drei Nachkommastellen sprechen für Tausendertrennung
+                // ("1.500"), sonst ist es ein Dezimalpunkt ("487.50").
+                const nach = n.slice(punkt + 1);
+                if (nach.length === 3 && n.indexOf('.') === punkt) n = n.replace(/\./g, '');
             }
 
-            // Prüfe mit Regex: nur Ziffern und optional ein Punkt
-            if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return NaN;
+            if (!/^\d+(\.\d{1,2})?$/.test(n)) return NaN;
+            const wert = parseFloat(n);
+            if (!isFinite(wert)) return NaN;
+            if (erlaubeNull ? wert < 0 : wert <= 0) return NaN;
+            return Math.round(wert * 100) / 100;
+        }
 
-            const num = parseFloat(normalized);
-            if (!isFinite(num) || num <= 0) return NaN;
-            return Math.round(num * 100) / 100;
+        function parseAmount(str) {
+            return parseBetrag(str, false);
         }
 
         function formatEuro(amount) {
@@ -2156,7 +2200,9 @@
                 pendingExpense = { amount, category: selectedCategory, note, overBudget: 'cash' };
                 document.getElementById('warningTitle').innerText = 'Nicht genug Bargeld!';
                 document.getElementById('warningText').innerText =
-                    `Dein Bargeldbestand beträgt nur ${formatEuro(appState.totalCash)}. Trotzdem als Ausgabe verbuchen (Bestand geht auf 0,00 €)?`;
+                    // Vorher stand hier "Bestand geht auf 0,00 €" – eine Untergrenze, die es
+                    // nicht gibt: der Bestand darf negativ werden. Jetzt steht der echte Wert da.
+                    `Dein Bargeldbestand beträgt nur ${formatEuro(appState.totalCash)}. Nach dieser Ausgabe wären es ${formatEuro(appState.totalCash - amount)}.`;
                 openModal('warningModal');
                 return;
             }
@@ -2195,16 +2241,8 @@
                 note: note,
                 date: new Date().toISOString()
             };
-            appState.transactions.unshift(tx);
-            recomputeTotalCash();
-            // S6: Toast nur bei erfolgreichem Speichern anzeigen
-            const saved = saveToStorage();
             document.getElementById('expenseForm').reset();
-            populateMonthSelect();
-            renderUI();
-            if (saved) {
-                showToast('Ausgabe gebucht: ' + formatEuro(amount));
-            }
+            bucheMitRuecknahme(tx, 'Ausgabe gebucht: ' + formatEuro(amount));
         }
 
         function confirmPendingExpense() {
@@ -2862,12 +2900,7 @@
 
         // parseAmount lehnt 0 ab (für Ausgaben richtig) – beim Nachzählen ist 0 ein gültiger Stand
         function parseAmountAllowZero(str) {
-            if (typeof str !== 'string') return NaN;
-            const bereinigt = str.replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
-            if (!/^\d+(\.\d{1,2})?$/.test(bereinigt)) return NaN;
-            const wert = parseFloat(bereinigt);
-            if (!isFinite(wert) || wert < 0) return NaN;
-            return Math.round(wert * 100) / 100;
+            return parseBetrag(str, true);
         }
 
         function saveCashCount(event) {
