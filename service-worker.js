@@ -1,4 +1,10 @@
-const CACHE_NAME = 'cashcontrol-v2';
+const CACHE_NAME = 'cashcontrol-v3';
+
+// Beide Apps des Haushalts liegen auf derselben Adresse (github.io) und teilen
+// sich damit den Cache-Speicher. Beim Aufräumen darf deshalb nur angefasst
+// werden, was zu CashControl gehört – sonst löscht ein Update hier der
+// Schwester-App VorratsCheck den Offline-Speicher weg.
+const CACHE_PREFIX = 'cashcontrol-';
 
 // APP_SHELL mit nur lokalen Assets – keine fremden Hosts
 const APP_SHELL = [
@@ -29,7 +35,9 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys
+        .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+        .map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();

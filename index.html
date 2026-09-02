@@ -449,6 +449,15 @@
             </div>
         </div>
 
+        <!-- Hinweis am Anfang einer neuen Geldperiode. Ohne ihn wirkt ein kleines
+             Tagesbudget wie ein Fehler, obwohl es nur der Rest des Vormonats ist. -->
+        <div id="periodBanner" class="backup-banner hidden">
+            <span class="backup-banner-text" id="periodBannerText"></span>
+            <div class="backup-banner-actions">
+                <button onclick="openModal('incomeModal')" class="bg-emerald-600 hover:bg-emerald-500 text-white">Geld eintragen</button>
+            </div>
+        </div>
+
         <!-- Bestandskarte: tritt bewusst hinter die Statuskarte zurück. Der Bestand ist
              Kontext, die Entscheidungszahl steht eine Karte weiter unten. -->
         <section class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 relative overflow-hidden">
@@ -881,6 +890,7 @@
                 renderCategoryChips();
                 renderUI();
                 updateBackupBanner();
+                merkeRenderTag();
                 handleStartAction();
             } catch (e) {
                 // Ohne diesen Zweig zeigt die App bei defektem Zustand ihr statisches
@@ -890,6 +900,7 @@
                 try { zeigeLadeFehler(); } catch (e2) { /* Markup unvollstaendig */ }
             }
             setupModalKeyboard();
+            ueberwacheTageswechsel();
             registerServiceWorker();
         });
 
@@ -1311,6 +1322,38 @@
             } else {
                 banner.classList.add('hidden');
             }
+        }
+
+        // Am Anfang einer neuen Geldperiode steht oft nur noch der Rest des Vormonats
+        // im Portemonnaie. Das Tagesbudget ist dann winzig und sieht wie ein Fehler aus.
+        // Dieser Hinweis sagt, woran es liegt, und bietet den einen nötigen Schritt an.
+        function updatePeriodBanner() {
+            const banner = document.getElementById('periodBanner');
+            const text = document.getElementById('periodBannerText');
+            if (!banner || !text) return;
+
+            const start = getPeriodStart();
+            const tageSeitStart = Math.floor((Date.now() - start.getTime()) / 86400000);
+
+            // Nach zwei Wochen ist es kein Monatswechsel mehr, sondern der Alltag –
+            // ab dann schweigt der Hinweis, statt zu nörgeln.
+            if (tageSeitStart < 0 || tageSeitStart > 14) {
+                banner.classList.add('hidden');
+                return;
+            }
+
+            const hatGeld = appState.transactions.some(tx =>
+                tx.type === 'income' && new Date(tx.date).getTime() >= start.getTime());
+
+            if (hatGeld) {
+                banner.classList.add('hidden');
+                return;
+            }
+
+            const monatsName = new Date().toLocaleDateString('de-DE', { month: 'long' });
+            text.innerText = `Für ${monatsName} ist noch kein Geld eingetragen. `
+                + `Das Tagesbudget rechnet gerade nur mit dem Rest aus dem Vormonat.`;
+            banner.classList.remove('hidden');
         }
 
         function dismissBackupBanner() {
@@ -1811,12 +1854,74 @@
             return Array.from(months).sort().reverse();
         }
 
-        function populateMonthSelect() {
+        function populateMonthSelect(erzwingeAktuellenMonat = false) {
             const select = document.getElementById('categoryMonthSelect');
             const current = select.value;
             const months = getAvailableMonths();
             select.innerHTML = months.map(m => `<option value="${m}">${formatMonthLabel(m)}</option>`).join('');
+
+            // Nach einem Monatswechsel auf den neuen Monat springen. Ohne das bleibt
+            // die Übersicht auf dem alten Monat stehen, weil dieser weiterhin in der
+            // Liste steht und damit als gültige Auswahl erhalten bleibt – im
+            // September stand hier dann immer noch August.
+            if (erzwingeAktuellenMonat) {
+                const aktuellerMonat = toLocalMonthKey(new Date());
+                select.value = months.includes(aktuellerMonat) ? aktuellerMonat : months[0];
+                return;
+            }
+
             select.value = months.includes(current) ? current : months[0];
+        }
+
+        // ---------- Tageswechsel ----------
+        // Eine installierte PWA wird beim Öffnen nicht neu geladen, sondern aus dem
+        // Hintergrund geweckt. Alle Zahlen hier werden aber beim Rendern einmalig
+        // aus "heute" berechnet. Ohne diese Überwachung zeigt die App nach
+        // Mitternacht unverändert das Tagesbudget von gestern – und nach einem
+        // Monatswechsel die Auswertung des Vormonats, obwohl der neue längst läuft.
+        let letzterRenderTag = null;
+
+        function merkeRenderTag() {
+            letzterRenderTag = toLocalDateKey(new Date());
+        }
+
+        function aktualisiereBeiTageswechsel() {
+            const heute = toLocalDateKey(new Date());
+            if (letzterRenderTag === null) { letzterRenderTag = heute; return false; }
+            if (letzterRenderTag === heute) return false;
+
+            const monatGewechselt = letzterRenderTag.slice(0, 7) !== heute.slice(0, 7);
+            letzterRenderTag = heute;
+
+            try {
+                // Geplante Ausgaben hängen am Monat und wurden bisher nur beim
+                // Neustart übernommen. Ohne diesen Aufruf fallen sie beim
+                // Monatswechsel aus der Rechnung, und das Tagesbudget springt
+                // stillschweigend nach oben – obwohl das Geld längst verplant ist.
+                if (monatGewechselt) carryOverReservations();
+                populateMonthSelect(monatGewechselt);
+                renderUI();
+            } catch (e) {
+                // Ein fehlgeschlagenes Neuzeichnen darf die laufende App nicht
+                // abschießen – die alten Werte sind falsch, aber bedienbar.
+                console.error('Aktualisierung beim Tageswechsel fehlgeschlagen:', e);
+                return false;
+            }
+            return true;
+        }
+
+        function ueberwacheTageswechsel() {
+            // Beim Zurückholen aus dem Hintergrund – der häufigste Fall auf dem Handy.
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) aktualisiereBeiTageswechsel();
+            });
+            window.addEventListener('focus', aktualisiereBeiTageswechsel);
+            window.addEventListener('pageshow', aktualisiereBeiTageswechsel);
+
+            // Und für den Fall, dass die App über Mitternacht offen liegen bleibt.
+            // Die Prüfung ist ein Stringvergleich; gerendert wird nur beim echten
+            // Wechsel, nicht jede Minute.
+            setInterval(aktualisiereBeiTageswechsel, 60000);
         }
 
         function formatMonthLabel(monthStr) {
@@ -2528,6 +2633,7 @@
             // Reservations sum display
             document.getElementById('reservedSumDisplay').innerText = formatEuro(reservedRemaining);
 
+            updatePeriodBanner();
             renderTrafficLight(todaySpent, dailyLimit, totalCash);
             renderCategoryBreakdown();
             renderTransactions();
@@ -2832,14 +2938,21 @@
         // Warndialog, der bei normalem Einkaufen mehrmals pro Woche kommt, wird
         // reflexhaft weggetippt und greift dann auch beim echten Impulskauf nicht mehr.
         // Deshalb löst nicht mehr der Tag aus, sondern die rollende Woche.
+        // Beginn der laufenden Geldperiode: der letzte Zahltag. Eine Periode vor dem
+        // Horizont – dieselbe Grundlage, auf der auch der Wochentopf rechnet.
+        function getPeriodStart() {
+            const start = new Date(getHorizonDate());
+            start.setMonth(start.getMonth() - 1);
+            return start;
+        }
+
         function getWeekSpent() {
             const jetzt = new Date();
             let grenze = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - 6);
             // Nicht ueber den letzten Zahltag hinaus zurueckschauen: sonst zaehlen Ausgaben
             // aus dem alten Geld gegen den neuen Wochentopf, und der erste Einkauf nach
             // dem Zahltag loest sofort Alarm aus.
-            const periodenStart = new Date(getHorizonDate());
-            periodenStart.setMonth(periodenStart.getMonth() - 1);
+            const periodenStart = getPeriodStart();
             if (periodenStart.getTime() > grenze.getTime()) grenze = periodenStart;
             return appState.transactions
                 .filter(tx => tx.type === 'expense' && new Date(tx.date) >= grenze)
