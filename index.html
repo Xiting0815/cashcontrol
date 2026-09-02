@@ -881,6 +881,7 @@
                 renderCategoryChips();
                 renderUI();
                 updateBackupBanner();
+                merkeRenderTag();
                 handleStartAction();
             } catch (e) {
                 // Ohne diesen Zweig zeigt die App bei defektem Zustand ihr statisches
@@ -890,6 +891,7 @@
                 try { zeigeLadeFehler(); } catch (e2) { /* Markup unvollstaendig */ }
             }
             setupModalKeyboard();
+            ueberwacheTageswechsel();
             registerServiceWorker();
         });
 
@@ -1811,12 +1813,74 @@
             return Array.from(months).sort().reverse();
         }
 
-        function populateMonthSelect() {
+        function populateMonthSelect(erzwingeAktuellenMonat = false) {
             const select = document.getElementById('categoryMonthSelect');
             const current = select.value;
             const months = getAvailableMonths();
             select.innerHTML = months.map(m => `<option value="${m}">${formatMonthLabel(m)}</option>`).join('');
+
+            // Nach einem Monatswechsel auf den neuen Monat springen. Ohne das bleibt
+            // die Übersicht auf dem alten Monat stehen, weil dieser weiterhin in der
+            // Liste steht und damit als gültige Auswahl erhalten bleibt – im
+            // September stand hier dann immer noch August.
+            if (erzwingeAktuellenMonat) {
+                const aktuellerMonat = toLocalMonthKey(new Date());
+                select.value = months.includes(aktuellerMonat) ? aktuellerMonat : months[0];
+                return;
+            }
+
             select.value = months.includes(current) ? current : months[0];
+        }
+
+        // ---------- Tageswechsel ----------
+        // Eine installierte PWA wird beim Öffnen nicht neu geladen, sondern aus dem
+        // Hintergrund geweckt. Alle Zahlen hier werden aber beim Rendern einmalig
+        // aus "heute" berechnet. Ohne diese Überwachung zeigt die App nach
+        // Mitternacht unverändert das Tagesbudget von gestern – und nach einem
+        // Monatswechsel die Auswertung des Vormonats, obwohl der neue längst läuft.
+        let letzterRenderTag = null;
+
+        function merkeRenderTag() {
+            letzterRenderTag = toLocalDateKey(new Date());
+        }
+
+        function aktualisiereBeiTageswechsel() {
+            const heute = toLocalDateKey(new Date());
+            if (letzterRenderTag === null) { letzterRenderTag = heute; return false; }
+            if (letzterRenderTag === heute) return false;
+
+            const monatGewechselt = letzterRenderTag.slice(0, 7) !== heute.slice(0, 7);
+            letzterRenderTag = heute;
+
+            try {
+                // Geplante Ausgaben hängen am Monat und wurden bisher nur beim
+                // Neustart übernommen. Ohne diesen Aufruf fallen sie beim
+                // Monatswechsel aus der Rechnung, und das Tagesbudget springt
+                // stillschweigend nach oben – obwohl das Geld längst verplant ist.
+                if (monatGewechselt) carryOverReservations();
+                populateMonthSelect(monatGewechselt);
+                renderUI();
+            } catch (e) {
+                // Ein fehlgeschlagenes Neuzeichnen darf die laufende App nicht
+                // abschießen – die alten Werte sind falsch, aber bedienbar.
+                console.error('Aktualisierung beim Tageswechsel fehlgeschlagen:', e);
+                return false;
+            }
+            return true;
+        }
+
+        function ueberwacheTageswechsel() {
+            // Beim Zurückholen aus dem Hintergrund – der häufigste Fall auf dem Handy.
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) aktualisiereBeiTageswechsel();
+            });
+            window.addEventListener('focus', aktualisiereBeiTageswechsel);
+            window.addEventListener('pageshow', aktualisiereBeiTageswechsel);
+
+            // Und für den Fall, dass die App über Mitternacht offen liegen bleibt.
+            // Die Prüfung ist ein Stringvergleich; gerendert wird nur beim echten
+            // Wechsel, nicht jede Minute.
+            setInterval(aktualisiereBeiTageswechsel, 60000);
         }
 
         function formatMonthLabel(monthStr) {
