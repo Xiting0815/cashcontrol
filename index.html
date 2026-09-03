@@ -1806,7 +1806,10 @@
             return Math.max(0, verfuegbar) / days;
         }
 
-        function getAverageDailySpend(tage = 7) {
+        // 10 statt 7 Tage: Ein einzelner ausgabearmer/starker Wochenendtag
+        // schlägt bei 7 Tagen zu stark durch; 10 Tage glätten das, ohne
+        // die Reaktion auf echte Verhaltensänderungen zu sehr zu verzögern.
+        function getAverageDailySpend(tage = 10) {
             const now = new Date();
             const expenses = [];
 
@@ -1830,7 +1833,7 @@
         }
 
         function getRunwayDays() {
-            const avgSpend = getAverageDailySpend(7);
+            const avgSpend = getAverageDailySpend(10);
             if (avgSpend <= 0) return null;
             // Dieselbe Grundlage wie getTrajectory(): eingeplantes Geld steht für den
             // täglichen Verbrauch nicht zur Verfügung. Sonst zeigt die App zwei
@@ -2588,7 +2591,7 @@
             // Runway display
             const runwayDisplay = document.getElementById('runwayDisplay');
             const runwayDate = getRunwayDate();
-            const avgSpend = getAverageDailySpend(7);
+            const avgSpend = getAverageDailySpend(10);
 
             if (avgSpend === 0) {
                 runwayDisplay.innerText = 'Noch keine Ausgaben erfasst';
@@ -2971,7 +2974,7 @@
         // Diese Funktion beantwortet die andere Frage: reicht es bis zum nächsten Geld?
         function getTrajectory() {
             const tage = getDaysUntilHorizon();
-            const schnitt = getAverageDailySpend(7);
+            const schnitt = getAverageDailySpend(10);
             const verfuegbar = Math.max(0, appState.totalCash - getReservedRemaining());
             if (schnitt <= 0) {
                 return { status: 'unbekannt', fehltage: 0, reichweite: null, schnitt: 0, tage };
