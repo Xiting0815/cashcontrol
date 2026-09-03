@@ -1806,7 +1806,10 @@
             return Math.max(0, verfuegbar) / days;
         }
 
-        function getAverageDailySpend(tage = 7) {
+        // 10 statt 7 Tage: Ein einzelner ausgabearmer/starker Wochenendtag
+        // schlägt bei 7 Tagen zu stark durch; 10 Tage glätten das, ohne
+        // die Reaktion auf echte Verhaltensänderungen zu sehr zu verzögern.
+        function getAverageDailySpend(tage = 10) {
             const now = new Date();
             const expenses = [];
 
@@ -1830,7 +1833,7 @@
         }
 
         function getRunwayDays() {
-            const avgSpend = getAverageDailySpend(7);
+            const avgSpend = getAverageDailySpend(10);
             if (avgSpend <= 0) return null;
             // Dieselbe Grundlage wie getTrajectory(): eingeplantes Geld steht für den
             // täglichen Verbrauch nicht zur Verfügung. Sonst zeigt die App zwei
@@ -2002,6 +2005,17 @@
                 .filter(tx => tx.type === 'adjust')
                 .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
+            // Echter Tagesschnitt des Monats – bezogen auf die Tage, die tatsächlich vergangen sind.
+            // Bei einem noch laufenden Monat also nur bis heute, nicht auf den ganzen Monat hochgerechnet:
+            // sonst wäre die Zahl am 3. eines Monats hoffnungslos verzerrt.
+            const [reportYear, reportMonthNum] = monthKey.split('-').map(Number);
+            const daysInReportMonth = new Date(reportYear, reportMonthNum, 0).getDate();
+            const avgBasisAktuellerMonat = monthKey === toLocalMonthKey(new Date());
+            const avgBasisDays = avgBasisAktuellerMonat
+                ? Math.min(daysInReportMonth, new Date().getDate())
+                : daysInReportMonth;
+            const avgDailyExpense = Math.round((totalExpense / Math.max(1, avgBasisDays)) * 100) / 100;
+
             return {
                 monthKey,
                 totalIncome,
@@ -2010,7 +2024,10 @@
                 totalAdjust: Math.round(totalAdjust * 100) / 100,
                 txCount: txs.length,
                 categories,
-                incomeItems
+                incomeItems,
+                avgDailyExpense,
+                avgBasisDays,
+                avgBasisAktuellerMonat
             };
         }
 
@@ -2024,7 +2041,12 @@
             text += `Ausgegeben:   ${formatEuro(report.totalExpense)}\n`;
 
             const salSign = report.saldo >= 0 ? '+' : '';
-            text += `Differenz:    ${salSign}${formatEuro(report.saldo)}\n\n`;
+            text += `Differenz:    ${salSign}${formatEuro(report.saldo)}\n`;
+
+            const avgBasisLabel = report.avgBasisAktuellerMonat
+                ? `bisher ${report.avgBasisDays} ${report.avgBasisDays === 1 ? 'Tag' : 'Tage'}`
+                : `${report.avgBasisDays} Tage`;
+            text += `Ø pro Tag:    ${formatEuro(report.avgDailyExpense)}  (${avgBasisLabel})\n\n`;
 
             if (report.totalAdjust !== 0) {
                 text += `Korrekturen:  ${report.totalAdjust >= 0 ? '+' : '−'}${formatEuro(Math.abs(report.totalAdjust))}\n`;
@@ -2151,6 +2173,13 @@
                         <span class="text-xs text-slate-400">Differenz:</span>
                         <span class="text-sm font-semibold ${report.saldo >= 0 ? 'text-emerald-400' : 'text-red-400'}">
                             ${report.saldo >= 0 ? '+' : ''}${formatEuro(report.saldo)}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-xs text-slate-400">Ø Ausgaben/Tag:</span>
+                        <span class="text-sm font-semibold text-slate-200">
+                            ${formatEuro(report.avgDailyExpense)}
+                            <span class="text-slate-500 font-normal">${report.avgBasisAktuellerMonat ? `(bisher ${report.avgBasisDays} ${report.avgBasisDays === 1 ? 'Tag' : 'Tage'})` : `(${report.avgBasisDays} Tage)`}</span>
                         </span>
                     </div>
                     ${report.totalAdjust !== 0 ? `
@@ -2588,7 +2617,7 @@
             // Runway display
             const runwayDisplay = document.getElementById('runwayDisplay');
             const runwayDate = getRunwayDate();
-            const avgSpend = getAverageDailySpend(7);
+            const avgSpend = getAverageDailySpend(10);
 
             if (avgSpend === 0) {
                 runwayDisplay.innerText = 'Noch keine Ausgaben erfasst';
@@ -2971,7 +3000,7 @@
         // Diese Funktion beantwortet die andere Frage: reicht es bis zum nächsten Geld?
         function getTrajectory() {
             const tage = getDaysUntilHorizon();
-            const schnitt = getAverageDailySpend(7);
+            const schnitt = getAverageDailySpend(10);
             const verfuegbar = Math.max(0, appState.totalCash - getReservedRemaining());
             if (schnitt <= 0) {
                 return { status: 'unbekannt', fehltage: 0, reichweite: null, schnitt: 0, tage };
