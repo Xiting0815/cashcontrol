@@ -2356,7 +2356,8 @@
             const wochenTopf = getWeeklyBudget();
             const wocheAusgegeben = getWeekSpent();
 
-            if (wochenTopf > 0 && (wocheAusgegeben + amount) > wochenTopf + 0.005) {
+            if (wochenTopf > 0 && amount >= getWeeklyWarnMinimum()
+                && (wocheAusgegeben + amount) > wochenTopf + 0.005) {
                 pendingExpense = { amount, category: selectedCategory, note, overBudget: 'weekly' };
                 document.getElementById('warningTitle').innerText = 'Das sprengt die Woche';
 
@@ -2975,23 +2976,62 @@
             return start;
         }
 
-        function getWeekSpent() {
+        // Länge des Wochenfensters. Beide Seiten der Rechnung müssen gleich lang
+        // sein. Vorher stand hier ein Topf über min(7, Tage bis Geld), verglichen
+        // mit den Ausgaben von immer sieben Tagen: wer noch vier Tage bis zum Geld
+        // hatte, bekam einen Topf für vier Tage und sieben Tage Ausgaben dagegen —
+        // eine Warnung, die am Monatsende zwangsläufig kam, egal wie sparsam.
+        function getWeekWindowDays() {
+            return Math.max(1, Math.min(7, getDaysUntilHorizon()));
+        }
+
+        function getWeekWindowStart() {
             const jetzt = new Date();
-            let grenze = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - 6);
+            const tage = getWeekWindowDays();
+            let grenze = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - (tage - 1));
             // Nicht ueber den letzten Zahltag hinaus zurueckschauen: sonst zaehlen Ausgaben
             // aus dem alten Geld gegen den neuen Wochentopf, und der erste Einkauf nach
             // dem Zahltag loest sofort Alarm aus.
             const periodenStart = getPeriodStart();
             if (periodenStart.getTime() > grenze.getTime()) grenze = periodenStart;
-            return appState.transactions
-                .filter(tx => tx.type === 'expense' && new Date(tx.date) >= grenze)
-                .reduce((summe, tx) => summe + (Number(tx.amount) || 0), 0);
+            return grenze;
+        }
+
+        // Netto, nicht brutto: Was im selben Zeitraum hereinkam, darf auch wieder
+        // ausgegeben werden. Vorher zaehlten nur die Ausgaben — wer 200 € einnahm
+        // und am selben Tag ausgab, stand keinen Cent schlechter da, bekam aber
+        // eine Woche lang bei JEDER Buchung eine Warnung, weil die 200 € gegen
+        // einen Topf gerechnet wurden, der aus dem Rest danach berechnet ist.
+        function getWeekSpent() {
+            const grenze = getWeekWindowStart().getTime();
+            // Obergrenze "jetzt": ein Datum in der Zukunft (Zeitzonen, Importe,
+            // falsch gestellte Geraeteuhr) darf das Fenster nicht aufblaehen.
+            const jetzt = Date.now();
+            let ausgaben = 0;
+            let einnahmen = 0;
+            for (const tx of appState.transactions) {
+                const zeit = new Date(tx.date).getTime();
+                if (!isFinite(zeit) || zeit < grenze || zeit > jetzt) continue;
+                const betrag = Number(tx.amount) || 0;
+                if (tx.type === 'expense') ausgaben += betrag;
+                else if (tx.type === 'income') einnahmen += betrag;
+            }
+            return Math.max(0, ausgaben - einnahmen);
         }
 
         function getWeeklyBudget() {
             // Nie mehr als das, was bis zum Zahltag überhaupt zur Verfügung steht
-            const tage = Math.min(7, getDaysUntilHorizon());
-            return getDailyLimit() * tage;
+            return getDailyLimit() * getWeekWindowDays();
+        }
+
+        // Ab welchem Betrag ist eine Buchung ueberhaupt gross genug, um den
+        // Wochendialog zu rechtfertigen? Wer exakt im Budget lebt, liegt per
+        // Definition genau auf der Topfgrenze — dann schlaegt jede weitere
+        // Buchung an, auch das Broetchen fuer 80 Cent. Genau das trainiert das
+        // Wegklicken an, das dieser Dialog vermeiden soll. Deshalb greift er nur
+        // noch beim groesseren Kauf: ab einem halben Tagesbudget, mindestens 1 €.
+        function getWeeklyWarnMinimum() {
+            return Math.max(1, getDailyLimit() * 0.5);
         }
 
         // ---------- Flugbahn ----------
