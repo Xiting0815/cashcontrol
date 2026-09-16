@@ -1809,27 +1809,58 @@
         // 10 statt 7 Tage: Ein einzelner ausgabearmer/starker Wochenendtag
         // schlägt bei 7 Tagen zu stark durch; 10 Tage glätten das, ohne
         // die Reaktion auf echte Verhaltensänderungen zu sehr zu verzögern.
+        // Dieser Schnitt beantwortet nur eine Frage: Wie schnell nimmt das Bargeld
+        // tatsächlich ab? Nicht, wie viel durch die Hände geht. Daran hängen zwei
+        // Dinge, die vorher fehlten.
+        //
+        // Einnahmen im selben Zeitraum werden gegengerechnet. Ein Durchlaufposten
+        // – 250 € eingenommen, am selben Tag wieder ausgegeben – trieb den Schnitt
+        // sonst von 13,50 € auf 38,50 €, und die App warnte neun Tage lang, obwohl
+        // der Bestand unveraendert bei 465 € stand. Ausgenommen ist allein die
+        // Einnahme am Zahltag: sie ist die Grundlage des Budgets und steckt bereits
+        // im Bestand. Wuerde sie mitgerechnet, bliebe die Warnung ausgerechnet dann
+        // aus, wenn das frische Geld in wenigen Tagen verbrannt wird.
+        //
+        // Und das Fenster reicht nie ueber den letzten Zahltag zurueck. Sonst zaehlen
+        // Ausgaben aus dem alten Geld gegen die neue Periode: am Monatsersten stand
+        // der Schnitt dadurch auf dem Tempo des Vormonats (28 € statt 15 €).
         function getAverageDailySpend(tage = 10) {
-            const now = new Date();
-            const expenses = [];
+            const jetzt = new Date();
+            const heute = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
 
-            // Sammle alle Ausgaben der letzten `tage` Kalendertage
-            for (let i = 0; i < tage; i++) {
-                const checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-                const dateKey = toLocalDateKey(checkDate);
+            let start = new Date(heute.getFullYear(), heute.getMonth(), heute.getDate() - (tage - 1));
+            const periodenStart = getPeriodStart();
+            if (periodenStart.getTime() > start.getTime()) start = periodenStart;
 
-                const daySpent = appState.transactions
-                    .filter(tx => tx.type === 'expense' && txLocalDateKey(tx) === dateKey)
-                    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+            const periodenStartKey = toLocalDateKey(periodenStart);
+            const startMs = start.getTime();
+            const jetztMs = jetzt.getTime();
 
-                if (daySpent > 0) {
-                    expenses.push(daySpent);
+            let ausgaben = 0;
+            let einnahmen = 0;
+            for (const tx of appState.transactions) {
+                const zeit = new Date(tx.date).getTime();
+                // Obergrenze "jetzt": ein Datum in der Zukunft – durch Zeitzonen,
+                // einen Import oder eine falsch gestellte Geraeteuhr – darf den
+                // Schnitt nicht aufblaehen.
+                if (!isFinite(zeit) || zeit < startMs || zeit > jetztMs) continue;
+                const betrag = Number(tx.amount) || 0;
+                if (tx.type === 'expense') {
+                    ausgaben += betrag;
+                } else if (tx.type === 'income' && txLocalDateKey(tx) !== periodenStartKey) {
+                    einnahmen += betrag;
                 }
             }
 
-            if (expenses.length === 0) return 0;
-            const total = expenses.reduce((sum, x) => sum + x, 0);
-            return total / tage;
+            const netto = Math.max(0, ausgaben - einnahmen);
+            if (netto <= 0) return 0;
+
+            // Bewusst durch `tage` geteilt, nicht durch die Laenge des verkuerzten
+            // Fensters: Es ist der Schnitt der letzten zehn Tage, und die Tage vor
+            // dem Zahltag zaehlen dabei als null. Durch die kurze Fensterlaenge zu
+            // teilen wuerde am zweiten Tag einer Periode aus einem einzigen
+            // Grosseinkauf eine Hochrechnung machen, die sofort Alarm ausloest.
+            return netto / tage;
         }
 
         function getRunwayDays() {
