@@ -422,6 +422,179 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* ============================================================
+           Lesbarkeit und Farbgewicht
+           ============================================================ */
+
+        /* Fließtext stand durchgehend auf 12 px. Draußen, bei Sonne, für
+           Erwachsene ist das der größere Mangel als jede Farbfrage.
+           ID-Selektoren, damit sie die Utility-Klassen sicher überstimmen. */
+        #statusMessage,
+        #runwayDisplay,
+        #periodBannerText,
+        #backupBannerText {
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #aeb9c6;
+        }
+
+        /* Weiß auf #059669 ergibt 3,77:1 und verfehlt die geforderten 4,5:1.
+           #047857 bringt 5,5:1 bei praktisch gleicher Anmutung. */
+        .bg-emerald-600 { background-color: #047857; }
+        .bg-emerald-600:hover { background-color: #059669; }
+
+        /* ============================================================
+           Naht und Tempo-Gegenüberstellung
+           Die beiden Zahlen der App stammen aus zwei Rechnungen mit
+           verschiedenem Nenner: das Tagesbudget teilt den Rest auf die
+           Resttage (eine Auflage), die Reichweite rechnet das bisherige
+           Tempo hoch (eine Prognose). Bisher standen nur ihre FOLGEN da,
+           gleichrangig und scheinbar widersprüchlich. Hier steht ihre
+           gemeinsame URSACHE: Soll gegen Ist derselben Größe.
+           ============================================================ */
+
+        .naht {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 1.25rem 0 0.75rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a94a3;
+            white-space: nowrap;
+        }
+        .naht::before, .naht::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #2a323d;
+        }
+        .naht::before { flex: 0 0 0.5rem; }
+
+        .tempo {
+            margin: 0;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            background: #0a0e14;
+        }
+        .tempo > div {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 0.75rem;
+        }
+        .tempo > div + div {
+            margin-top: 0.375rem;
+            padding-top: 0.375rem;
+            border-top: 1px dashed #2a323d;
+        }
+        .tempo dt {
+            font-size: 0.8125rem;
+            color: #8a94a3;
+        }
+        .tempo dd {
+            margin: 0;
+            font-size: 0.9375rem;
+            font-weight: 700;
+            color: #f2f5f8;
+            font-variant-numeric: tabular-nums;
+        }
+        .tempo dd i {
+            font-style: normal;
+            font-weight: 400;
+            font-size: 0.8125rem;
+            color: #8a94a3;
+        }
+        /* Nur das Ist wird eingefärbt, wenn es über dem Soll liegt. Das Soll
+           bleibt immer neutral – es ist die Messlatte, nicht der Befund. */
+        .tempo--zuschnell dd.tempo__ist { color: #ff8a8a; }
+        .tempo--knapp     dd.tempo__ist { color: #f5b841; }
+
+        .tempo__folge {
+            margin: 0.75rem 0 0;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #aeb9c6;
+        }
+        .tempo__folge b { color: #f2f5f8; font-weight: 700; }
+
+        /* ============================================================
+           Bestätigung für einen guten Tag
+           Die App kannte bisher nur Tadel. Der steigende Tagessatz ist
+           die echte, sofort ausgabefähige Folge eines sparsamen Tages –
+           keine erfundene Belohnung, sondern eine Buchung.
+           ============================================================ */
+        .lobband {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.75rem 0.75rem 0.75rem 1rem;
+            margin-bottom: 1.25rem;
+            border-radius: 0.75rem;
+            border-left: 3px solid #34d399;
+            background: #0c2a21;
+        }
+        .lobband__glyphe {
+            flex: 0 0 auto;
+            width: 12px; height: 12px;
+            margin-top: 4px;
+            border-radius: 50%;
+            background: #34d399;
+        }
+        .lobband__text {
+            flex: 1;
+            margin: 0;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #aeb9c6;
+        }
+        .lobband__text b { color: #f2f5f8; font-weight: 700; }
+
+        /* ============================================================
+           Muster-Karte
+           ============================================================ */
+        .muster {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .muster__marke {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a94a3;
+        }
+        .muster__liste { list-style: none; margin: 0; padding: 0; }
+        .muster__satz {
+            margin: 0;
+            font-size: 0.9375rem;
+            line-height: 1.5;
+            color: #aeb9c6;
+        }
+        .muster__satz + .muster__satz {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #2a323d;
+        }
+        .muster__satz b {
+            color: #f2f5f8;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        .muster__grundlage {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.6875rem;
+            color: #8a94a3;
+        }
     </style>
 </head>
 <body>
@@ -521,10 +694,42 @@
                 </div>
             </div>
 
+            <!-- Naht: ab hier wechselt die Zeitebene von "heute" auf "bis zum Zahltag".
+                 Ohne diese sichtbare Trennung wirken die beiden Zahlen wie zwei
+                 widersprüchliche Meinungen über dieselbe Sache. -->
+            <div class="naht"><span id="nahtText">Bis zum Geld</span></div>
+
+            <dl class="tempo" id="tempoBlock">
+                <div>
+                    <dt>Dein Tempo</dt>
+                    <dd class="tempo__ist" id="tempoIst">–</dd>
+                </div>
+                <div>
+                    <dt>Nötig bis zum Geld</dt>
+                    <dd id="tempoSoll">–</dd>
+                </div>
+            </dl>
+
+            <p class="tempo__folge" id="tempoFolge"></p>
+
             <!-- Status Message -->
             <p id="statusMessage" class="text-xs text-slate-400 mt-3 leading-relaxed">
                 Du bist heute gut im Rahmen. Spontane Zusatzkäufe vermeiden.
             </p>
+        </section>
+
+        <!-- Bestätigung für den Vortag. Steht bewusst NACH der Heldenkarte:
+             sie ist Rückmeldung, nicht Entscheidungsgrundlage. -->
+        <div id="lobBand" class="lobband hidden" role="status">
+            <span class="lobband__glyphe" aria-hidden="true"></span>
+            <p class="lobband__text" id="lobBandText"></p>
+        </div>
+
+        <!-- Erkannte Muster. Bleibt vollständig verborgen, solange keines
+             seine Mindestdatenmenge erreicht – lieber leer als geraten. -->
+        <section id="musterKarte" class="muster hidden">
+            <span class="muster__marke">Muster</span>
+            <ul class="muster__liste" id="musterListe"></ul>
         </section>
 
         <!-- A7: Quick Expense Form (moved before reservations) -->
@@ -1294,6 +1499,16 @@
         function updateBackupBanner() {
             const banner = document.getElementById('backupBanner');
             const bannerText = document.getElementById('backupBannerText');
+
+            // Höchstens ein Band gleichzeitig. Standen Backup-Erinnerung und
+            // Periodenhinweis übereinander, schoben sie die Heldenkarte unter den
+            // sichtbaren Rand – ausgerechnet die Zahl, für die man die App öffnet.
+            // Der Periodenhinweis ist dringlicher; die Backup-Erinnerung kann warten.
+            const periode = document.getElementById('periodBanner');
+            if (periode && !periode.classList.contains('hidden')) {
+                banner.classList.add('hidden');
+                return;
+            }
 
             const dismissed = localStorage.getItem('cashControl_backupBannerDismissed');
             const now = Date.now();
@@ -2689,17 +2904,263 @@
             const isNegative = todayRemaining < 0;
             document.getElementById('todayRemainingLabel').innerText = isNegative ? 'Über Ziel' : 'Verbleibend heute';
             document.getElementById('todayRemainingDisplay').innerText = formatEuro(isNegative ? -todayRemaining : todayRemaining);
-            document.getElementById('todayRemainingDisplay').style.color = isNegative ? '#f87171' : '#10b981';
+            // Neutralweiß statt Grün im Normalfall. Die App war zu rund 90 % grün –
+            // Bestand, Heldenzahl, Knöpfe, Punkt. Wenn Grün fast alles bedeutet,
+            // bedeutet es nichts mehr, und eine rote Zeile wirkt wie ein Fehler
+            // statt wie eine Aussage. Grün bleibt dem Zugewinn vorbehalten.
+            document.getElementById('todayRemainingDisplay').style.color = isNegative ? '#ff8a8a' : '#f2f5f8';
 
             // Reservations sum display
             document.getElementById('reservedSumDisplay').innerText = formatEuro(reservedRemaining);
 
             updatePeriodBanner();
+            renderTempoVergleich(dailyLimit);
+            renderLobBand(dailyLimit);
+            renderMuster();
             renderTrafficLight(todaySpent, dailyLimit, totalCash);
             renderCategoryBreakdown();
             renderTransactions();
             renderReservations();
             updateBackupBanner();
+        }
+
+        // ---------- Soll gegen Ist ----------
+        // Die beiden Zahlen der App stammen aus zwei Rechnungen: das Tagesbudget
+        // teilt den Rest auf die Resttage (eine Auflage, geht immer auf), die
+        // Reichweite rechnet das bisherige Tempo hoch (eine Prognose). Solange nur
+        // ihre Folgen nebeneinanderstanden – "noch 4,35 € heute" und "6 Tage zu
+        // früh" – wirkten sie wie ein Widerspruch. Hier stehen sie als das, was sie
+        // sind: Soll und Ist derselben Größe.
+        function renderTempoVergleich(dailyLimit) {
+            const naht = document.getElementById('nahtText');
+            const block = document.getElementById('tempoBlock');
+            const istEl = document.getElementById('tempoIst');
+            const sollEl = document.getElementById('tempoSoll');
+            const folge = document.getElementById('tempoFolge');
+            if (!block || !istEl || !sollEl || !folge) return;
+
+            const tage = getDaysUntilHorizon();
+            const flug = getTrajectory();
+            naht.innerText = `Bis zum Geld · noch ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`;
+
+            sollEl.innerHTML = `${formatEuro(dailyLimit)}<i> /Tag</i>`;
+
+            if (flug.status === 'unbekannt' || !(flug.schnitt > 0)) {
+                istEl.innerHTML = `<i>noch keine Ausgaben</i>`;
+                block.className = 'tempo';
+                folge.innerText = '';
+                return;
+            }
+
+            istEl.innerHTML = `${formatEuro(flug.schnitt)}<i> /Tag</i>`;
+
+            if (flug.fehltage > 2) {
+                block.className = 'tempo tempo--zuschnell';
+                folge.innerHTML = `<b>${flug.fehltage} ${flug.fehltage === 1 ? 'Tag fehlt' : 'Tage fehlen'}.</b> `
+                    + `Ab jetzt ${formatEuro(dailyLimit)} pro Tag schließt die Lücke.`;
+            } else if (flug.fehltage > 0) {
+                block.className = 'tempo tempo--knapp';
+                folge.innerHTML = `Es wird knapp: <b>${flug.fehltage} ${flug.fehltage === 1 ? 'Tag' : 'Tage'}</b> `
+                    + `fehlen bei diesem Tempo.`;
+            } else {
+                block.className = 'tempo';
+                const puffer = Math.abs(flug.fehltage);
+                folge.innerHTML = puffer > 0
+                    ? `Dein Tempo trägt <b>${puffer} ${puffer === 1 ? 'Tag' : 'Tage'}</b> über den Zahltag hinaus.`
+                    : `Dein Tempo trägt genau bis zum Zahltag.`;
+            }
+        }
+
+        // ---------- Bestätigung für den Vortag ----------
+        // Der steigende Tagessatz ist die echte Folge eines sparsamen Tages: Weil
+        // das Restgeld auf weniger Tage verteilt wird, steigt das Budget von selbst.
+        // Das ist keine erfundene Belohnung, sondern eine Buchung – und es ist die
+        // einzige positive Rückmeldung, die die App überhaupt kennt.
+        function renderLobBand(dailyLimit) {
+            const band = document.getElementById('lobBand');
+            const text = document.getElementById('lobBandText');
+            if (!band || !text) return;
+            band.classList.add('hidden');
+
+            // Sobald heute gebucht wurde, gehört die Aufmerksamkeit dem laufenden Tag.
+            if (getTodaySpent() > 0) return;
+
+            const jetzt = new Date();
+            const gestern = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - 1);
+            const gesternKey = toLocalDateKey(gestern);
+
+            // Nicht über den Zahltag hinweg loben: davor galt ein anderer Tagessatz.
+            if (gesternKey < toLocalDateKey(getPeriodStart())) return;
+
+            const gebucht = appState.transactions.filter(tx => txLocalDateKey(tx) === gesternKey);
+            const ausgaben = gebucht
+                .filter(tx => tx.type === 'expense')
+                .reduce((s, tx) => s + (Number(tx.amount) || 0), 0);
+
+            // Nicht erfassen ist kein Sparen. Ohne diese Sperre lobt die App am
+            // lautesten, wenn die Daten am wertlosesten sind.
+            if (!gebucht.some(tx => tx.type === 'expense')) return;
+            if (!(dailyLimit > 0) || ausgaben >= dailyLimit) return;
+
+            const unterPlan = dailyLimit - ausgaben;
+            if (unterPlan < 1) return;
+
+            text.innerHTML = `Gestern <b>${formatEuro(unterPlan)}</b> unter dem Tagessatz. `
+                + `Dadurch stehen dir heute <b>${formatEuro(dailyLimit)}</b> zur Verfügung.`;
+            band.classList.remove('hidden');
+        }
+
+        // ---------- Muster ----------
+        // Drei Beobachtungen, die schon nach wenigen Tagen belastbar sind. Jede hat
+        // eine Mindestdatenmenge; wird sie verfehlt, schweigt sie. Eine Aussage, die
+        // bei dünner Datenlage Unsinn behauptet, ist schlimmer als gar keine – sie
+        // beschädigt das Vertrauen in alle anderen Zahlen der App mit.
+        function musterAusreisser() {
+            const start = getPeriodStart().getTime();
+            const jetztDatum = new Date();
+            const jetzt = jetztDatum.getTime();
+            const posten = appState.transactions.filter(tx => {
+                if (tx.type !== 'expense') return false;
+                const t = new Date(tx.date).getTime();
+                return isFinite(t) && t >= start && t <= jetzt;
+            });
+            if (posten.length < 12) return null;
+
+            const betraege = posten.map(tx => Number(tx.amount) || 0).sort((a, b) => a - b);
+            const median = arr => {
+                const m = Math.floor(arr.length / 2);
+                return arr.length % 2 ? arr[m] : (arr[m - 1] + arr[m]) / 2;
+            };
+            const m = median(betraege);
+            if (!(m > 0)) return null;
+            // Mittlere absolute Abweichung statt Standardabweichung: die würde vom
+            // Ausreißer selbst verdorben, den sie finden soll.
+            const mad = median(betraege.map(x => Math.abs(x - m)).sort((a, b) => a - b));
+            const sigma = Math.max(1.4826 * mad, 0.2 * m);
+
+            const groesste = posten.reduce((a, b) =>
+                (Number(a.amount) || 0) >= (Number(b.amount) || 0) ? a : b);
+            const betrag = Number(groesste.amount) || 0;
+            const z = (betrag - m) / sigma;
+            const d0 = new Date(groesste.date);
+            const heuteMitternacht = new Date(jetztDatum.getFullYear(), jetztDatum.getMonth(), jetztDatum.getDate());
+            const buchungMitternacht = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate());
+            const tageHer = Math.round((heuteMitternacht - buchungMitternacht) / 86400000);
+
+            if (z < 4 || betrag < 3 * m || betrag < Math.max(25, 2 * getDailyLimit())) return null;
+            if (tageHer > 14) return null;
+
+            const d = new Date(groesste.date);
+            const datum = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
+            const bezeichnung = (groesste.note && groesste.note.trim())
+                ? groesste.note.trim() : (groesste.category || 'Sonstiges');
+            const faktor = (betrag / m).toFixed(1).replace('.', ',');
+
+            return {
+                score: 60,
+                text: `<b>${escapeHtml(datum)}</b>: ${formatEuro(betrag)} für ${escapeHtml(bezeichnung)} `
+                    + `— das ${faktor}-Fache deiner üblichen Buchung.`,
+                grundlage: `Grundlage: ${posten.length} Buchungen seit dem Zahltag.`
+            };
+        }
+
+        function musterSerie(dailyLimit) {
+            if (!(dailyLimit > 0)) return null;
+            const jetzt = new Date();
+            const grenze = toLocalDateKey(getPeriodStart());
+            let serie = 0, gespart = 0, mitBuchung = 0;
+
+            for (let i = 1; i <= 31; i++) {
+                const tag = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - i);
+                const key = toLocalDateKey(tag);
+                if (key < grenze) break;   // nicht über den Zahltag: anderer Tagessatz
+                const gebucht = appState.transactions.filter(tx => txLocalDateKey(tx) === key);
+                const aus = gebucht
+                    .filter(tx => tx.type === 'expense')
+                    .reduce((s, tx) => s + (Number(tx.amount) || 0), 0);
+                if (aus > dailyLimit) break;
+                serie++;
+                gespart += (dailyLimit - aus);
+                if (gebucht.some(tx => tx.type === 'expense')) mitBuchung++;
+            }
+
+            // Dieselbe Sperre wie beim Lobband, und hier noch wichtiger: eine Serie
+            // aus Tagen ohne Buchung misst Vergesslichkeit, nicht Sparsamkeit.
+            if (serie < 3) return null;
+            if (mitBuchung < Math.max(2, Math.ceil(serie * 0.4))) return null;
+
+            return {
+                score: 50 + Math.min(35, serie * 5),
+                text: `<b>${serie} Tage in Folge</b> unter deinem Tagessatz — zusammen `
+                    + `<b>${formatEuro(gespart)}</b> unter Plan.`,
+                grundlage: `Grundlage: ${mitBuchung} dieser Tage mit Buchung.`
+            };
+        }
+
+        function musterPrognose(dailyLimit) {
+            const start = getPeriodStart();
+            const heute = new Date();
+            const zyklusTag = Math.round(
+                (new Date(heute.getFullYear(), heute.getMonth(), heute.getDate()) - start) / 86400000) + 1;
+            // Vor dem fünften Tag einer Periode ist jede Hochrechnung Kaffeesatz.
+            if (zyklusTag < 5) return null;
+
+            const flug = getTrajectory();
+            if (flug.status === 'unbekannt' || !(flug.schnitt > 0)) return null;
+
+            const restTage = getDaysUntilHorizon();
+            const verfuegbar = Math.max(0, appState.totalCash - getReservedRemaining());
+            const prognose = verfuegbar - flug.schnitt * restTage;
+            if (Math.abs(prognose) < Math.max(10, 0.5 * dailyLimit)) return null;
+
+            const zahltag = getHorizonDate();
+            const datum = `${String(zahltag.getDate()).padStart(2, '0')}.${String(zahltag.getMonth() + 1).padStart(2, '0')}.`;
+
+            if (prognose < 0) {
+                return {
+                    score: 95,
+                    text: `Tag ${zyklusTag}: Bei deinem Tempo fehlen zum ${datum} etwa `
+                        + `<b>${formatEuro(Math.abs(prognose))}</b>. Mit ${formatEuro(dailyLimit)} pro Tag reicht es.`,
+                    grundlage: ''
+                };
+            }
+            return {
+                score: 65,
+                text: `Tag ${zyklusTag}: Bei deinem Tempo bleiben zum ${datum} etwa `
+                    + `<b>${formatEuro(prognose)}</b> übrig.`,
+                grundlage: ''
+            };
+        }
+
+        function renderMuster() {
+            const karte = document.getElementById('musterKarte');
+            const liste = document.getElementById('musterListe');
+            if (!karte || !liste) return;
+
+            const dailyLimit = getDailyLimit();
+            let gefunden = [];
+            try {
+                gefunden = [musterPrognose(dailyLimit), musterSerie(dailyLimit), musterAusreisser()]
+                    .filter(Boolean)
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 2);
+            } catch (e) {
+                // Eine kaputte Beobachtung darf die Oberfläche nicht mitreißen.
+                console.error('Muster konnten nicht berechnet werden:', e);
+                gefunden = [];
+            }
+
+            if (!gefunden.length) {
+                karte.classList.add('hidden');
+                liste.innerHTML = '';
+                return;
+            }
+
+            liste.innerHTML = gefunden.map(m =>
+                `<li class="muster__satz">${m.text}`
+                + (m.grundlage ? `<span class="muster__grundlage">${escapeHtml(m.grundlage)}</span>` : '')
+                + `</li>`).join('');
+            karte.classList.remove('hidden');
         }
 
         function renderTrafficLight(spent, limit, totalCash) {
@@ -3002,9 +3463,18 @@
         // Beginn der laufenden Geldperiode: der letzte Zahltag. Eine Periode vor dem
         // Horizont – dieselbe Grundlage, auf der auch der Wochentopf rechnet.
         function getPeriodStart() {
-            const start = new Date(getHorizonDate());
-            start.setMonth(start.getMonth() - 1);
-            return start;
+            const horizont = getHorizonDate();
+            const jahr = horizont.getFullYear();
+            const monat = horizont.getMonth();
+            const tag = horizont.getDate();
+
+            // Den Tag im Vormonat kappen. setMonth(monat - 1) rollt sonst weiter,
+            // wenn es den Tag dort nicht gibt: Vom 31. März aus landete die Rechnung
+            // auf dem 3. März statt auf dem 28. Februar. Der Zahltag selbst ist auf
+            // 1 bis 28 begrenzt, ein gesetztes Streck-Ziel aber nicht – und an diesem
+            // Datum kappen sowohl das Wochenfenster als auch der Zehn-Tage-Schnitt.
+            const letzterImVormonat = new Date(jahr, monat, 0).getDate();
+            return new Date(jahr, monat - 1, Math.min(tag, letzterImVormonat), 0, 0, 0, 0);
         }
 
         // Länge des Wochenfensters. Beide Seiten der Rechnung müssen gleich lang
@@ -3342,7 +3812,7 @@
         function getBudgetUsage(catId, monthKey) {
             const categoryExpenses = appState.transactions
                 .filter(tx => tx.type === 'expense' && tx.category === catId && txLocalMonthKey(tx) === monthKey)
-                .reduce((sum, tx) => sum + tx.amount, 0);
+                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
 
             const budget = appState.budgets?.[catId] || 0;
             const isBudgetSet = budget > 0;
@@ -3358,7 +3828,7 @@
             } else {
                 const monthTotal = appState.transactions
                     .filter(tx => tx.type === 'expense' && txLocalMonthKey(tx) === monthKey)
-                    .reduce((sum, tx) => sum + tx.amount, 0);
+                    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
                 pct = monthTotal > 0 ? Math.round((spent / monthTotal) * 100) : 0;
                 budgetAmount = monthTotal;
             }
