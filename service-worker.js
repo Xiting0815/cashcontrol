@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cashcontrol-v3';
+const CACHE_NAME = 'cashcontrol-v4';
 
 // Beide Apps des Haushalts liegen auf derselben Adresse (github.io) und teilen
 // sich damit den Cache-Speicher. Beim Aufräumen darf deshalb nur angefasst
@@ -20,12 +20,9 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       // Lokale Assets müssen alle da sein
-      return cache.addAll(APP_SHELL).then(() => {
-        // Tailwind separat und fehlertolerant cachen
-        return cache.add('https://cdn.tailwindcss.com').catch(() => {
-          // Fehler ignorieren – Tailwind-Ausfall sprengt Installation nicht mehr
-        });
-      });
+      // Seit dem Umbau bringt die App ihr CSS selbst mit. Der Tailwind-CDN
+      // wird nicht mehr geladen und muss deshalb auch nicht gecacht werden.
+      return cache.addAll(APP_SHELL);
     })
   );
   self.skipWaiting();

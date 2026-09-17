@@ -1,13 +1,12 @@
 <!DOCTYPE html>
-<html lang="de" class="dark">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CashControl – Bargeld Rationierer</title>
 
-    <!-- PWA: Manifest + Icons + Android/iOS Home-Screen Support -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#0b1220">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
@@ -15,1012 +14,1303 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CashControl">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        if (typeof tailwind !== 'undefined') {
-            tailwind.config = {
-                darkMode: 'class',
-                theme: {
-                    extend: {
-                        colors: {
-                            brand: {
-                                50: '#f0fdf4',
-                                500: '#22c55e',
-                                600: '#16a34a',
-                                900: '#14532d',
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Kein Tailwind-CDN mehr. Der Play-CDN ist ein Compiler, der bei jedem
+         Start im Browser läuft; Tailwind sagt selbst, dass er nicht für den
+         echten Betrieb gedacht ist. Ohne Netz kam die App bisher kurz nackt
+         hoch. Das folgende Stylesheet deckt alles ab, was Markup und JS
+         benutzen – und liegt in der Datei, also sofort da. -->
     <style>
-        /* B10: Tailwind-Absturz abfedern – Minimalgerüst */
-        * {
-            box-sizing: border-box;
-        }
+/* ========================================================================
+   1. Tokens
+   ===================================================================== */
+:root {
+    --bg:            #0b1220;
+    --flaeche:       #161f30;
+    --flaeche-tief:  #0d1524;
+    --flaeche-hoch:  #212c40;
+    --linie:         #2b3852;
+    --linie-zart:    #1f2a3d;
 
-        html {
-            font-size: 16px;
-        }
+    --text:          #f2f5f8;
+    --text-2:        #c2ccd9;
+    --text-3:        #a5b2c2;
+    --text-4:        #8593a5;
 
-        body {
-            background-color: #0f172a;
-            color: #f1f5f9;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 0;
-            padding-bottom: env(safe-area-inset-bottom);
-            line-height: 1.5;
-        }
+    --gruen:         #34d399;
+    --gruen-knopf:   #047857;
+    --gruen-knopf-h: #059669;
+    --rot:           #ff8a8a;
+    --rot-kraeftig:  #ef4444;
+    --gelb:          #f5b841;
 
-        header {
-            background-color: #0f172a;
-            border-bottom: 1px solid #1e293b;
-            padding-top: env(safe-area-inset-top);
-            position: sticky;
-            top: 0;
-            z-index: 30;
-        }
+    --radius:        1rem;
+    --radius-s:      0.75rem;
+    --tableiste:     4.25rem;
+}
 
-        main {
-            max-width: 448px;
-            margin: 0 auto;
-            padding: 1rem;
-            padding-bottom: 88px;
-        }
+/* ========================================================================
+   2. Grundlagen
+   ===================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
 
-        section {
-            margin-bottom: 1.25rem;
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 1rem;
-            padding: 1.25rem;
-        }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 
-        h1, h2, h3 {
-            font-weight: 700;
-            margin: 0;
-        }
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    margin: 0;
+    line-height: 1.5;
+    /* Platz für Tableiste und Auslöser, sonst verdeckt die Leiste den letzten Eintrag. */
+    padding-bottom: calc(var(--tableiste) + env(safe-area-inset-bottom));
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+}
 
-        h1 {
-            font-size: 1.125rem;
-        }
+h1, h2, h3, h4, p, ul, ol, dl, dd, dt, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
 
-        h2 {
-            font-size: 1rem;
-        }
+/* Ohne diesen Reset erben Knöpfe die Systemschrift des Browsers und stehen
+   plötzlich hell auf hell. Das hat mich in der Schwester-App schon erwischt. */
+button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
 
-        label {
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: #94a3b8;
-            display: block;
-            margin-bottom: 0.25rem;
-        }
+input, select, textarea { font: inherit; }
 
-        input[type="text"],
-        input[type="number"],
-        select,
-        textarea {
-            width: 100%;
-            background-color: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 0.75rem;
-            padding: 0.625rem 0.75rem;
-            color: #f1f5f9;
-            font-size: 0.875rem;
-        }
+input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    background-color: var(--flaeche-tief);
+    border: 1px solid var(--linie);
+    border-radius: var(--radius-s);
+    color: var(--text);
+    padding: 0.625rem 0.75rem;
+    width: 100%;
+    min-height: 2.75rem;
+    appearance: none;
+}
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--gruen);
+    box-shadow: 0 0 0 1px var(--gruen);
+}
+input::placeholder { color: var(--text-4); }
 
-        input[type="text"]:focus,
-        input[type="number"]:focus,
-        select:focus,
-        textarea:focus {
-            border-color: #10b981;
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
-        }
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23a5b2c2' d='M2 4.5 6 8.5 10 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 0.75rem;
+    padding-right: 2rem;
+}
 
-        :focus-visible {
-            outline: 2px solid #34d399;
-            outline-offset: 2px;
-        }
+:focus-visible { outline: 2px solid var(--gruen); outline-offset: 2px; }
 
-        button {
-            font-size: 0.875rem;
-            padding: 0.625rem 1rem;
-            border: none;
-            border-radius: 0.75rem;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s ease-in-out;
-        }
+/* ========================================================================
+   3. Hülle: Kopf, Bildschirme, Tableiste
+   ===================================================================== */
+.kopf {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background-color: rgba(11, 18, 32, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--linie-zart);
+    padding-top: env(safe-area-inset-top);
+}
+.kopf__reihe {
+    max-width: 28rem;
+    margin: 0 auto;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.kopf__marke {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.kopf__punkt {
+    width: 0.5rem; height: 0.5rem;
+    border-radius: 999px;
+    background-color: var(--gruen);
+    flex: none;
+}
 
-        button:active {
-            transform: scale(0.99);
-        }
+main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
-        .bg-emerald-600 {
-            background-color: #059669;
-        }
+/* Jeder Bildschirm ist ein eigener Abschnitt. Nur einer ist sichtbar.
+   Das ersetzt die frühere Endlosseite mit acht Karten untereinander. */
+.bildschirm { display: none; }
+.bildschirm[data-aktiv="ja"] { display: block; }
+.bildschirm > * + * { margin-top: 1rem; }
 
-        .bg-emerald-600:hover {
-            background-color: #10b981;
-        }
+.tableiste {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    display: flex;
+    background-color: rgba(13, 21, 36, 0.96);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--linie-zart);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+.tableiste__knopf {
+    flex: 1 1 0;
+    min-width: 0;
+    height: var(--tableiste);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1875rem;
+    color: var(--text-4);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: color 0.15s;
+}
+.tableiste__knopf svg { width: 1.375rem; height: 1.375rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tableiste__knopf[aria-selected="true"] { color: var(--gruen); }
+/* Der Buchen-Knopf sitzt mitten in der Leiste und ist bewusst der größte
+   Treffer: Buchen ist die häufigste Handlung und lag vorher weit unten. */
+.tableiste__buchen {
+    flex: 0 0 4.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.tableiste__buchen span {
+    width: 3.25rem; height: 3.25rem;
+    margin-top: -1.25rem;
+    border-radius: 999px;
+    background-color: var(--gruen-knopf);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    font-weight: 300;
+    line-height: 1;
+    box-shadow: 0 8px 20px rgba(4, 120, 87, 0.45);
+    border: 3px solid var(--bg);
+}
+.tableiste__buchen:hover span { background-color: var(--gruen-knopf-h); }
 
-        .bg-slate-700 {
-            background-color: #334155;
-        }
+/* ========================================================================
+   4. Karten
+   ===================================================================== */
+.karte {
+    background-color: var(--flaeche);
+    border: 1px solid var(--linie-zart);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+}
+.karte--still {
+    background-color: rgba(22, 31, 48, 0.55);
+    border-color: rgba(43, 56, 82, 0.5);
+    padding: 1rem;
+}
+.karte__titel {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.karte__kopf {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    /* Bei "Nach Kategorien" + Knopf + Monatswahl wird es auf 390 px eng und
+       die Ueberschrift brach mitten im Wort um. Lieber zweizeilig. */
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.karte__kopf > .karte__titel { white-space: nowrap; }
+.karte__kopf > :last-child { margin-left: auto; }
+.marke {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-4);
+}
 
-        .bg-slate-700:hover {
-            background-color: #475569;
-        }
+/* ========================================================================
+   5. Heldenzahl und Zwei-Spuren-Balken
+   ===================================================================== */
+.held__zahl {
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.05;
+    color: var(--text);
+}
 
-        .text-white {
-            color: #ffffff;
-        }
+/* Zwei Spuren übereinander: oben das Geld, unten die Zeit. Der Reiter zeigt,
+   wie weit die Periode ist. Steht die Geldfüllung rechts vom Reiter, ist das
+   Tempo zu hoch – genau der Widerspruch, der vorher nur als Text da war. */
+.spur { margin-top: 0.875rem; }
+.spur__kopf {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-3);
+    margin-bottom: 0.375rem;
+}
+.spur__kopf b { color: var(--text-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.spur__gleis {
+    position: relative;
+    height: 0.75rem;
+    background-color: rgba(43, 56, 82, 0.6);
+    border-radius: 999px;
+    overflow: hidden;
+    padding: 0.125rem;
+}
+.spur__fuellung {
+    height: 100%;
+    border-radius: 999px;
+    background-color: var(--gruen);
+    transition: width 0.5s ease, background-color 0.3s;
+    max-width: 100%;
+}
+.spur__reiter {
+    position: absolute;
+    top: -0.25rem;
+    bottom: -0.25rem;
+    width: 2px;
+    background-color: var(--text);
+    border-radius: 2px;
+    transition: left 0.5s ease;
+    box-shadow: 0 0 0 2px var(--flaeche);
+}
+.spur__fuss {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-4);
+    margin-top: 0.375rem;
+}
 
-        .text-slate-200 {
-            color: #e2e8f0;
-        }
+/* Zustände der Statuskarte. Als Attribut, damit die Bauteilklassen bleiben. */
+#statusCard[data-zustand="warn"]  { background-color: rgba(120, 83, 10, 0.18); border-color: rgba(245, 184, 65, 0.5); }
+#statusCard[data-zustand="alarm"] { background-color: rgba(69, 10, 10, 0.4);  border-color: rgba(239, 68, 68, 0.6); }
 
-        form {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
+#trafficLightDot[data-zustand="ok"]    { background-color: var(--gruen); }
+#trafficLightDot[data-zustand="warn"]  { background-color: var(--gelb); }
+#trafficLightDot[data-zustand="alarm"] { background-color: var(--rot-kraeftig); animation: pulsieren 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+#trafficLightDot[data-zustand="leer"]  { background-color: var(--text-4); }
 
-        /* B6: Modal CSS (statt hidden+flex im class) */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-            z-index: 50;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
+#statusBadge[data-zustand="ok"]    { background-color: rgba(52, 211, 153, 0.12); border-color: rgba(52, 211, 153, 0.3); color: var(--gruen); }
+#statusBadge[data-zustand="warn"]  { background-color: rgba(245, 184, 65, 0.12); border-color: rgba(245, 184, 65, 0.35); color: var(--gelb); }
+#statusBadge[data-zustand="alarm"] { background-color: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.4); color: var(--rot); }
+#statusBadge[data-zustand="leer"]  { background-color: var(--flaeche-hoch); border-color: var(--linie); color: var(--text-3); }
 
-        .modal.modal--open {
-            display: flex;
-        }
+#dailyProgressBar[data-zustand="warn"]  { background-color: var(--gelb); }
+#dailyProgressBar[data-zustand="alarm"] { background-color: var(--rot-kraeftig); }
+#dailyProgressBar[data-zustand="leer"]  { background-color: var(--text-4); }
 
-        .modal-content {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 1rem;
-            padding: 1.25rem;
-            width: 100%;
-            max-width: 28rem;
-        }
+/* ========================================================================
+   6. Naht, Tempo, Lobband, Muster  (aus der laufenden Version übernommen)
+   ===================================================================== */
+.naht {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin: 1.25rem 0 0.875rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-4);
+}
+.naht::before, .naht::after {
+    content: "";
+    height: 1px;
+    background-color: var(--linie);
+    flex: 1 1 auto;
+}
+.naht::before { flex: 0 0 0.5rem; }
 
-        .modal-header {
-            font-size: 1.125rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            color: #ffffff;
-        }
+.tempo { display: flex; margin: 0; }
+.tempo > div { flex: 1 1 0; min-width: 0; }
+.tempo > div + div { padding-left: 0.875rem; border-left: 1px solid var(--linie-zart); margin-left: 0.875rem; }
+.tempo dt {
+    font-size: 0.75rem;
+    color: var(--text-3);
+    margin-bottom: 0.125rem;
+}
+.tempo dd {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+.tempo dd i { font-style: normal; font-size: 0.8125rem; font-weight: 500; color: var(--text-3); }
+.tempo--zuschnell dd.tempo__ist { color: var(--rot); }
+.tempo--knapp     dd.tempo__ist { color: var(--gelb); }
 
-        .modal-divider {
-            height: 1px;
-            background-color: #334155;
-            margin: 0.75rem 0;
-        }
+.tempo__folge {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--text-3);
+    margin-top: 0.75rem;
+}
+.tempo__folge b { color: var(--text); font-weight: 700; }
+.tempo__folge:empty { display: none; }
 
-        /* B9: Backup-Banner */
-        .backup-banner {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 1rem;
-            padding: 0.75rem 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 0.875rem;
-            margin-bottom: 1.25rem;
-        }
+.lobband {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    background-color: rgba(4, 120, 87, 0.12);
+    border: 1px solid rgba(52, 211, 153, 0.25);
+    border-radius: var(--radius-s);
+    padding: 0.75rem 0.875rem;
+}
+.lobband__glyphe {
+    flex: none;
+    width: 1.125rem; height: 1.125rem;
+    margin-top: 0.125rem;
+    border-radius: 999px;
+    background-color: var(--gruen);
+    position: relative;
+}
+.lobband__glyphe::after {
+    content: "";
+    position: absolute;
+    left: 0.3125rem; top: 0.1875rem;
+    width: 0.3125rem; height: 0.5625rem;
+    border: solid #08281e;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.lobband__text { font-size: 0.9375rem; line-height: 1.5; color: var(--text-2); }
+.lobband__text b { color: var(--text); font-weight: 700; }
 
-        .backup-banner-text {
-            color: #cbd5e1;
-            flex: 1;
-        }
+.muster {
+    background-color: var(--flaeche);
+    border: 1px solid var(--linie-zart);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem 1.125rem;
+}
+.muster__marke {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--text-4);
+    margin-bottom: 0.625rem;
+}
+.muster__liste { list-style: none; margin: 0; padding: 0; }
+.muster__satz {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--text-2);
+}
+.muster__satz + .muster__satz {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--linie-zart);
+}
+.muster__satz b { color: var(--text); font-weight: 700; }
+.muster__grundlage {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--text-4);
+    margin-top: 0.1875rem;
+}
 
-        .backup-banner-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
+/* ========================================================================
+   7. Banner, Chips, Listen
+   ===================================================================== */
+.backup-banner {
+    background-color: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+.backup-banner-text { color: var(--text-2); flex: 1 1 auto; }
+.backup-banner-actions { display: flex; gap: 0.5rem; flex: none; }
+.backup-banner button {
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-s);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    min-height: 2.75rem;
+}
 
-        .backup-banner button {
-            padding: 0.5rem 0.75rem;
-            font-size: 0.75rem;
-        }
+.chip-row {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    scrollbar-width: none;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip {
+    flex: none;
+    padding: 0.5rem 0.875rem;
+    border-radius: 999px;
+    background-color: var(--flaeche-hoch);
+    border: 1px solid var(--linie);
+    color: var(--text-2);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    min-height: 2.75rem;
+    transition: all 0.15s;
+}
+.chip:hover { background-color: var(--linie); }
+.chip.chip--active {
+    background-color: rgba(4, 120, 87, 0.25);
+    border-color: var(--gruen);
+    color: var(--gruen);
+}
 
-        /* A8: FAB */
-        .fab {
-            position: fixed;
-            bottom: calc(1.5rem + env(safe-area-inset-bottom));
-            right: 1.5rem;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background-color: #059669;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            border: none;
-            cursor: pointer;
-            z-index: 40;
-        }
+.filter-chips { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+.filter-chip {
+    padding: 0.4375rem 0.875rem;
+    border-radius: 999px;
+    background-color: var(--flaeche-tief);
+    border: 1px solid var(--linie);
+    color: var(--text-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    min-height: 2.75rem;
+}
+.filter-chip:hover { background-color: var(--flaeche-hoch); }
+.filter-chip.active {
+    background-color: var(--flaeche-hoch);
+    border-color: var(--gruen);
+    color: var(--gruen);
+}
 
-        .fab:hover {
-            background-color: #10b981;
-        }
+.tx-group-header {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-4);
+    padding: 0.625rem 0 0.375rem;
+}
 
-        /* A5: Chip-Reihe als Grid */
-        .chip-row {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-            min-height: 44px;
-        }
+.more-btn {
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.625rem;
+    border-radius: var(--radius-s);
+    background-color: var(--flaeche-hoch);
+    border: 1px solid var(--linie);
+    color: var(--text-2);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    min-height: 2.75rem;
+}
+.more-btn:hover { background-color: var(--linie); }
 
-        .chip {
-            background-color: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 1.5rem;
-            padding: 0.5rem 1rem;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            color: #cbd5e1;
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            /* Ohne min-width:0 wächst ein Chip über seine 1fr-Spalte hinaus, sobald
-               der Text länger ist – dann läuft die Reihe wieder seitlich über. */
-            min-width: 0;
-            text-align: center;
-            hyphens: auto;
-        }
+.menu-btn {
+    width: 2.75rem; height: 2.75rem;
+    border-radius: 999px;
+    background-color: var(--flaeche-hoch);
+    border: 1px solid var(--linie);
+    color: var(--text-2);
+    font-size: 1.125rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+.menu-btn:hover { background-color: var(--linie); }
 
-        .chip:hover {
-            border-color: #059669;
-        }
+.settings-sheet-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.875rem 0.75rem;
+    border-radius: var(--radius-s);
+    color: var(--text-2);
+    font-size: 0.9375rem;
+    min-height: 2.75rem;
+}
+.settings-sheet-item:hover { background-color: var(--flaeche-hoch); }
+.settings-sheet-item.danger { color: var(--rot); }
+.settings-sheet-item.danger:hover { background-color: rgba(239, 68, 68, 0.1); }
 
-        .chip.chip--active {
-            background-color: #059669;
-            border-color: #10b981;
-            color: #ffffff;
-        }
+.deleteBtn, .reservationDoneBtn, .reservationDeleteBtn {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-s);
+    color: var(--text-4);
+    flex: none;
+}
+.deleteBtn:hover, .reservationDeleteBtn:hover { color: var(--rot); background-color: rgba(239, 68, 68, 0.1); }
+.reservationDoneBtn:hover { color: var(--gruen); background-color: rgba(52, 211, 153, 0.1); }
 
-        /* Filter Chips */
-        .filter-chips {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
+.category-toggle { width: 100%; text-align: left; }
+.category-items { margin-top: 0.5rem; }
 
-        .filter-chip {
-            background-color: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 1.5rem;
-            padding: 0.5rem 1rem;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: #cbd5e1;
-        }
+/* ========================================================================
+   8. Modale und Buchungs-Sheet
+   ===================================================================== */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    /* Ueber dem Buchungs-Sheet (55): die Warnung "Das sprengt die Woche"
+       erscheint waehrend des Buchens und lag sonst dahinter. */
+    z-index: 60;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.modal.modal--open { display: flex; }
+.modal-content {
+    background-color: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 28rem;
+}
+.modal-header { font-size: 1.125rem; font-weight: 700; margin-bottom: 1rem; color: var(--text); }
+.modal-divider { height: 1px; background-color: var(--linie); margin: 0.75rem 0; }
 
-        .filter-chip:hover {
-            border-color: #059669;
-        }
+/* Das Buchen-Sheet fährt von unten ein, dort wo der Daumen ohnehin ist. */
+.sheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background-color: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    align-items: flex-end;
+    justify-content: center;
+}
+.sheet.sheet--offen { display: flex; }
+.sheet__blatt {
+    background-color: var(--flaeche);
+    border-top-left-radius: 1.5rem;
+    border-top-right-radius: 1.5rem;
+    border-top: 1px solid var(--linie);
+    width: 100%;
+    max-width: 28rem;
+    padding: 0.75rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    max-height: 92vh;
+    overflow-y: auto;
+    animation: hoch 0.22s ease-out;
+}
+@keyframes hoch { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+    .sheet__blatt { animation: none; }
+    .spur__fuellung, .spur__reiter { transition: none; }
+}
+.sheet__griff {
+    width: 2.25rem; height: 0.25rem;
+    border-radius: 999px;
+    background-color: var(--linie);
+    margin: 0 auto 0.875rem;
+}
+.sheet__kopf {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.875rem;
+}
+.sheet__titel { font-size: 1.0625rem; font-weight: 700; }
 
-        .filter-chip.active {
-            background-color: #059669;
-            border-color: #10b981;
-            color: white;
-        }
+/* Der Betrag steht groß und wird über einen eigenen Ziffernblock gefüllt.
+   Die Systemtastatur schiebt auf Android sonst das halbe Sheet aus dem Bild. */
+.betrag {
+    text-align: center;
+    font-size: 2.75rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    padding: 0.5rem 0 0.25rem;
+    min-height: 3.75rem;
+}
+.betrag--leer { color: var(--text-4); }
+.betrag__hinweis {
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--text-4);
+    min-height: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+.block {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+.block button {
+    height: 3.25rem;
+    border-radius: var(--radius-s);
+    background-color: var(--flaeche-hoch);
+    border: 1px solid var(--linie-zart);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text);
+}
+.block button:active { background-color: var(--linie); }
+.block button.block--weich { color: var(--text-3); font-size: 1.125rem; }
 
-        /* B8: Kategorie-Gruppierung */
-        .tx-group-header {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: #94a3b8;
-            text-transform: uppercase;
-            margin-top: 0.75rem;
-            margin-bottom: 0.5rem;
-            padding-left: 0.75rem;
-        }
+/* ========================================================================
+   9. Knöpfe
+   ===================================================================== */
+.knopf {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-s);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    min-height: 2.75rem;
+    transition: background-color 0.15s, transform 0.1s;
+}
+.knopf:active { transform: scale(0.99); }
+.knopf--voll { width: 100%; }
+/* Weiß auf #059669 ergibt nur 3,77:1. #047857 bringt 5,5:1 bei fast
+   gleicher Anmutung – deshalb ist der dunklere Ton der Normalzustand. */
+.knopf--haupt { background-color: var(--gruen-knopf); color: #fff; }
+.knopf--haupt:hover { background-color: var(--gruen-knopf-h); }
+.knopf--still { background-color: var(--flaeche-hoch); color: var(--text-2); border: 1px solid var(--linie); }
+.knopf--still:hover { background-color: var(--linie); }
+.knopf--rand { background: none; border: 1px solid var(--linie); color: var(--text-2); }
+.knopf--rand:hover { background-color: var(--flaeche-hoch); }
+.knopf--klein { padding: 0.5rem 0.75rem; font-size: 0.8125rem; min-height: 2.75rem; }
 
-        /* Utility */
-        .transition-all-200 {
-            transition: all 0.2s ease-in-out;
-        }
+.toast {
+    position: fixed;
+    bottom: calc(var(--tableiste) + 1rem + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--flaeche-hoch);
+    border: 1px solid var(--linie);
+    color: var(--text);
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+    border-radius: var(--radius-s);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 70;
+    max-width: calc(100vw - 2rem);
+}
+.toast.opacity-100 { opacity: 1; }
 
-        .hidden {
-            display: none !important;
-        }
+/* ========================================================================
+   10. Hilfsklassen – decken ab, was Markup und JS erzeugen
+   ===================================================================== */
+.hidden { display: none !important; }
 
-        /* Menu Button */
-        .menu-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #cbd5e1;
-        }
+.flex { display: flex; }
+.block-d { display: block; }
+.inline-block { display: inline-block; }
+.flex-1 { flex: 1 1 0%; }
+.shrink-0 { flex-shrink: 0; }
+.min-w-0 { min-width: 0; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-baseline { align-items: baseline; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.relative { position: relative; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+.top-0 { top: 0; }
+.bottom-4 { bottom: 1rem; }
+.left-1\/2 { left: 50%; }
+.-translate-x-1\/2 { transform: translateX(-50%); }
+.z-30 { z-index: 30; }
+.z-\[60\] { z-index: 60; }
+.overflow-hidden { overflow: hidden; }
+.overflow-y-auto { overflow-y: auto; }
+.max-h-96 { max-height: 24rem; }
+.max-w-md { max-width: 28rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.w-full { width: 100%; }
+.w-1\/2 { width: 50%; }
+.w-2 { width: 0.5rem; }
+.w-3\.5 { width: 0.875rem; }
+.w-12 { width: 3rem; }
+.h-2 { height: 0.5rem; }
+.h-3 { height: 0.75rem; }
+.h-3\.5 { height: 0.875rem; }
+.h-1\.5 { height: 0.375rem; }
+.h-12 { height: 3rem; }
+.h-full { height: 100%; }
+.min-h-11 { min-height: 2.75rem; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.uppercase { text-transform: uppercase; }
+.leading-none { line-height: 1; }
+.leading-relaxed { line-height: 1.625; }
+.pointer-events-none { pointer-events: none; }
+.backdrop-blur { backdrop-filter: blur(12px); }
 
-        .menu-btn:hover {
-            color: #10b981;
-        }
+.gap-1\.5 { gap: 0.375rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-2\.5 { gap: 0.625rem; }
+.gap-3 { gap: 0.75rem; }
 
-        /* Settings Sheet */
-        .settings-sheet-item {
-            padding: 1rem;
-            border-bottom: 1px solid #334155;
-            text-align: left;
-            background: none;
-            border: none;
-            width: 100%;
-            color: #cbd5e1;
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-        }
+.p-0\.5 { padding: 0.125rem; }
+.p-4 { padding: 1rem; }
+.p-5 { padding: 1.25rem; }
+.px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.pt-1 { padding-top: 0.25rem; }
+.pt-2 { padding-top: 0.5rem; }
+.pt-3 { padding-top: 0.75rem; }
+.pb-4 { padding-bottom: 1rem; }
+.pr-1 { padding-right: 0.25rem; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 0.75rem; }
 
-        .settings-sheet-item:hover {
-            background-color: #334155;
-        }
+.space-y-1 > * + * { margin-top: 0.25rem; }
+.space-y-1\.5 > * + * { margin-top: 0.375rem; }
+.space-y-2 > * + * { margin-top: 0.5rem; }
+.space-y-3 > * + * { margin-top: 0.75rem; }
+.space-y-4 > * + * { margin-top: 1rem; }
+.space-x-2 > * + * { margin-left: 0.5rem; }
 
-        .settings-sheet-item.danger {
-            color: #ef4444;
-        }
+.text-\[11px\] { font-size: 0.6875rem; }
+.text-xs { font-size: 0.8125rem; }
+.text-sm { font-size: 0.875rem; }
+.text-base { font-size: 1rem; }
+.text-lg { font-size: 1.125rem; }
+.text-xl { font-size: 1.25rem; }
+.text-2xl { font-size: 1.5rem; }
+.text-5xl { font-size: 3rem; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 800; }
+.tracking-tight { letter-spacing: -0.015em; }
+.tracking-tighter { letter-spacing: -0.03em; }
+.tracking-wide { letter-spacing: 0.01em; }
+.tracking-wider { letter-spacing: 0.05em; }
+.tracking-widest { letter-spacing: 0.12em; }
 
-        .settings-sheet-item.danger:hover {
-            background-color: #7f1d1d;
-        }
+.text-white { color: #fff; }
+.text-slate-100 { color: var(--text); }
+.text-slate-200 { color: var(--text-2); }
+.text-slate-300 { color: var(--text-2); }
+.text-slate-400 { color: var(--text-3); }
+.text-slate-500 { color: var(--text-4); }
+.text-slate-600 { color: var(--text-4); }
+.text-emerald-400 { color: var(--gruen); }
+.text-red-300, .text-red-400 { color: var(--rot); }
+.text-amber-300, .text-amber-400 { color: var(--gelb); }
 
-        /* More button */
-        .more-btn {
-            width: 100%;
-            background-color: #334155;
-            color: #cbd5e1;
-            padding: 0.75rem;
-            margin-top: 0.75rem;
-            text-align: center;
-            font-size: 0.875rem;
-        }
+.bg-transparent { background-color: transparent; }
+.bg-slate-500 { background-color: var(--text-4); }
+.bg-slate-600 { background-color: var(--linie); }
+.bg-slate-700 { background-color: var(--flaeche-hoch); }
+.bg-slate-700\/50, .bg-slate-700\/60 { background-color: rgba(43, 56, 82, 0.6); }
+.bg-slate-800 { background-color: var(--flaeche); }
+.bg-slate-800\/50 { background-color: rgba(22, 31, 48, 0.55); }
+.bg-slate-900 { background-color: var(--flaeche-tief); }
+.bg-slate-900\/40 { background-color: rgba(13, 21, 36, 0.4); }
+.bg-slate-900\/60 { background-color: rgba(13, 21, 36, 0.6); }
+.bg-slate-900\/80 { background-color: rgba(13, 21, 36, 0.8); }
+.bg-slate-950\/50 { background-color: rgba(2, 6, 23, 0.5); }
+.bg-emerald-500 { background-color: var(--gruen); }
+.bg-emerald-500\/10 { background-color: rgba(52, 211, 153, 0.1); }
+.bg-emerald-600 { background-color: var(--gruen-knopf); }
+.bg-red-500 { background-color: var(--rot-kraeftig); }
+.bg-red-500\/10 { background-color: rgba(239, 68, 68, 0.1); }
+.bg-red-950\/50 { background-color: rgba(69, 10, 10, 0.5); }
+.bg-amber-500\/20 { background-color: rgba(245, 158, 11, 0.2); }
 
-        .more-btn:hover {
-            background-color: #475569;
-        }
+.border { border: 1px solid var(--linie); }
+.border-b { border-bottom: 1px solid var(--linie); }
+.border-t { border-top: 1px solid var(--linie); }
+.border-slate-600 { border-color: var(--linie); }
+.border-slate-700, .border-slate-700\/50, .border-slate-700\/60 { border-color: var(--linie); }
+.border-slate-800 { border-color: var(--linie-zart); }
+.border-emerald-500\/20 { border-color: rgba(52, 211, 153, 0.25); }
+.border-red-500\/30 { border-color: rgba(239, 68, 68, 0.3); }
+.border-red-500\/70 { border-color: rgba(239, 68, 68, 0.7); }
+.border-amber-500\/30 { border-color: rgba(245, 158, 11, 0.3); }
 
-        .deleteBtn,
-        .reservationDoneBtn,
-        .reservationDeleteBtn {
-            min-width: 44px;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
+.rounded { border-radius: 0.25rem; }
+.rounded-md { border-radius: 0.375rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-2xl { border-radius: 1rem; }
+.rounded-full { border-radius: 999px; }
 
-        /* ============================================================
-           Lesbarkeit und Farbgewicht
-           ============================================================ */
+.shadow-sm { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.shadow-lg { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.shadow-xl { box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35); }
+.shadow-2xl { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5); }
+.ring-2 { box-shadow: 0 0 0 2px currentColor; }
+.ring-red-500\/25 { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25); }
 
-        /* Fließtext stand durchgehend auf 12 px. Draußen, bei Sonne, für
-           Erwachsene ist das der größere Mangel als jede Farbfrage.
-           ID-Selektoren, damit sie die Utility-Klassen sicher überstimmen. */
-        #statusMessage,
-        #runwayDisplay,
-        #periodBannerText,
-        #backupBannerText {
-            font-size: 0.9375rem;
-            line-height: 1.5;
-            color: #aeb9c6;
-        }
+.transition-all, .transition-all-200 { transition: all 0.2s; }
+.transition-colors { transition: color 0.2s, background-color 0.2s; }
+.transition-opacity { transition: opacity 0.3s; }
+.duration-300 { transition-duration: 0.3s; }
+.duration-500 { transition-duration: 0.5s; }
+.opacity-0 { opacity: 0; }
+.opacity-100 { opacity: 1; }
+.animate-pulse { animation: pulsieren 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes pulsieren { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-        /* Weiß auf #059669 ergibt 3,77:1 und verfehlt die geforderten 4,5:1.
-           #047857 bringt 5,5:1 bei praktisch gleicher Anmutung. */
-        .bg-emerald-600 { background-color: #047857; }
-        .bg-emerald-600:hover { background-color: #059669; }
+.hover\:bg-slate-600:hover { background-color: var(--linie); }
+.hover\:bg-slate-700:hover { background-color: var(--flaeche-hoch); }
+.hover\:bg-slate-900\/60:hover { background-color: rgba(13, 21, 36, 0.6); }
+.hover\:bg-emerald-500:hover { background-color: var(--gruen-knopf-h); }
+.hover\:bg-red-500\/10:hover { background-color: rgba(239, 68, 68, 0.1); }
+.hover\:text-red-400:hover { color: var(--rot); }
+.active\:scale-\[0\.99\]:active { transform: scale(0.99); }
 
-        /* ============================================================
-           Naht und Tempo-Gegenüberstellung
-           Die beiden Zahlen der App stammen aus zwei Rechnungen mit
-           verschiedenem Nenner: das Tagesbudget teilt den Rest auf die
-           Resttage (eine Auflage), die Reichweite rechnet das bisherige
-           Tempo hoch (eine Prognose). Bisher standen nur ihre FOLGEN da,
-           gleichrangig und scheinbar widersprüchlich. Hier steht ihre
-           gemeinsame URSACHE: Soll gegen Ist derselben Größe.
-           ============================================================ */
-
-        .naht {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin: 1.25rem 0 0.75rem;
-            font-size: 0.6875rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #8a94a3;
-            white-space: nowrap;
-        }
-        .naht::before, .naht::after {
-            content: "";
-            flex: 1;
-            height: 1px;
-            background: #2a323d;
-        }
-        .naht::before { flex: 0 0 0.5rem; }
-
-        .tempo {
-            margin: 0;
-            padding: 0.75rem;
-            border-radius: 0.75rem;
-            background: #0a0e14;
-        }
-        .tempo > div {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: 0.75rem;
-        }
-        .tempo > div + div {
-            margin-top: 0.375rem;
-            padding-top: 0.375rem;
-            border-top: 1px dashed #2a323d;
-        }
-        .tempo dt {
-            font-size: 0.8125rem;
-            color: #8a94a3;
-        }
-        .tempo dd {
-            margin: 0;
-            font-size: 0.9375rem;
-            font-weight: 700;
-            color: #f2f5f8;
-            font-variant-numeric: tabular-nums;
-        }
-        .tempo dd i {
-            font-style: normal;
-            font-weight: 400;
-            font-size: 0.8125rem;
-            color: #8a94a3;
-        }
-        /* Nur das Ist wird eingefärbt, wenn es über dem Soll liegt. Das Soll
-           bleibt immer neutral – es ist die Messlatte, nicht der Befund. */
-        .tempo--zuschnell dd.tempo__ist { color: #ff8a8a; }
-        .tempo--knapp     dd.tempo__ist { color: #f5b841; }
-
-        .tempo__folge {
-            margin: 0.75rem 0 0;
-            font-size: 0.9375rem;
-            line-height: 1.5;
-            color: #aeb9c6;
-        }
-        .tempo__folge b { color: #f2f5f8; font-weight: 700; }
-
-        /* ============================================================
-           Bestätigung für einen guten Tag
-           Die App kannte bisher nur Tadel. Der steigende Tagessatz ist
-           die echte, sofort ausgabefähige Folge eines sparsamen Tages –
-           keine erfundene Belohnung, sondern eine Buchung.
-           ============================================================ */
-        .lobband {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.75rem 0.75rem 0.75rem 1rem;
-            margin-bottom: 1.25rem;
-            border-radius: 0.75rem;
-            border-left: 3px solid #34d399;
-            background: #0c2a21;
-        }
-        .lobband__glyphe {
-            flex: 0 0 auto;
-            width: 12px; height: 12px;
-            margin-top: 4px;
-            border-radius: 50%;
-            background: #34d399;
-        }
-        .lobband__text {
-            flex: 1;
-            margin: 0;
-            font-size: 0.9375rem;
-            line-height: 1.5;
-            color: #aeb9c6;
-        }
-        .lobband__text b { color: #f2f5f8; font-weight: 700; }
-
-        /* ============================================================
-           Muster-Karte
-           ============================================================ */
-        .muster {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 1rem;
-            padding: 1rem;
-            margin-bottom: 1.25rem;
-        }
-        .muster__marke {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-size: 0.6875rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #8a94a3;
-        }
-        .muster__liste { list-style: none; margin: 0; padding: 0; }
-        .muster__satz {
-            margin: 0;
-            font-size: 0.9375rem;
-            line-height: 1.5;
-            color: #aeb9c6;
-        }
-        .muster__satz + .muster__satz {
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid #2a323d;
-        }
-        .muster__satz b {
-            color: #f2f5f8;
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-        }
-        .muster__grundlage {
-            display: block;
-            margin-top: 0.25rem;
-            font-size: 0.6875rem;
-            color: #8a94a3;
-        }
+/* Fließtext stand durchgehend auf 12 px. ID-Selektoren, damit sie die
+   Hilfsklassen im Markup sicher überstimmen. */
+#statusMessage, #runwayDisplay, #periodBannerText, #backupBannerText {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--text-3);
+}
     </style>
 </head>
 <body>
 
-    <!-- Top Bar Header (B5: Safe-Area-Padding) -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
-        <div class="max-w-md mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <div class="w-2 h-2 rounded-full bg-slate-600"></div>
-                <h1 class="font-bold text-lg tracking-wide text-slate-100">CashControl</h1>
+    <header class="kopf">
+        <div class="kopf__reihe">
+            <div class="kopf__marke">
+                <span class="kopf__punkt" id="trafficLightDot"></span>
+                <span>CashControl</span>
             </div>
-            <!-- B1: Menu Button -->
             <button class="menu-btn" onclick="openSettingsSheet()" aria-label="Menü">⋯</button>
         </div>
     </header>
 
     <main>
 
-        <!-- B9: Backup-Banner (wenn shouldRemindBackup true) -->
-        <div id="backupBanner" class="backup-banner hidden">
-            <span class="backup-banner-text" id="backupBannerText"></span>
-            <div class="backup-banner-actions">
-                <button onclick="exportBackupAndClose()" class="bg-emerald-600 hover:bg-emerald-500 text-white">Sichern</button>
-                <button onclick="dismissBackupBanner()" class="bg-slate-700 hover:bg-slate-600 text-slate-200">✕</button>
-            </div>
-        </div>
+        <!-- ============================ HEUTE ============================ -->
+        <section class="bildschirm" id="schirmHeute" data-aktiv="ja" role="tabpanel" aria-labelledby="tabHeute">
 
-        <!-- Hinweis am Anfang einer neuen Geldperiode. Ohne ihn wirkt ein kleines
-             Tagesbudget wie ein Fehler, obwohl es nur der Rest des Vormonats ist. -->
-        <div id="periodBanner" class="backup-banner hidden">
-            <span class="backup-banner-text" id="periodBannerText"></span>
-            <div class="backup-banner-actions">
-                <button onclick="openModal('incomeModal')" class="bg-emerald-600 hover:bg-emerald-500 text-white">Geld eintragen</button>
-            </div>
-        </div>
-
-        <!-- Bestandskarte: tritt bewusst hinter die Statuskarte zurück. Der Bestand ist
-             Kontext, die Entscheidungszahl steht eine Karte weiter unten. -->
-        <section class="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 relative overflow-hidden">
-            <div class="flex justify-between items-start mb-2">
-                <span class="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Bargeldbestand</span>
-                <button onclick="openModal('incomeModal')" class="text-xs bg-slate-700 text-slate-200 hover:bg-slate-600 border border-slate-600 px-3 py-2 rounded-lg font-medium transition-all">
-                    + Geld erhalten
-                </button>
-            </div>
-            <div class="text-xl font-bold tracking-tight mb-4 tabular-nums" id="totalCashDisplay" style="color: #f1f5f9;">0,00 €</div>
-
-            <div class="pt-3 border-t border-slate-700/50 space-y-1.5 text-xs text-slate-400">
-                <div>
-                    <span>Bis zum Geld: <strong class="text-slate-200" id="daysUntilMoneyDisplay">--</strong></span> Tage
-                </div>
-                <div id="runwayDisplay" class="text-slate-400">
-                    Noch keine Ausgaben erfasst
+            <div id="backupBanner" class="backup-banner hidden">
+                <span class="backup-banner-text" id="backupBannerText"></span>
+                <div class="backup-banner-actions">
+                    <button class="knopf knopf--haupt knopf--klein" onclick="exportBackupAndClose()">Sichern</button>
+                    <button class="knopf knopf--still knopf--klein" onclick="dismissBackupBanner()" aria-label="Hinweis schließen">✕</button>
                 </div>
             </div>
 
-            <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
-                <div class="flex justify-between text-xs text-slate-400">
-                    <span>davon eingeplant:</span>
-                    <span class="text-slate-200 font-semibold" id="reservedAmountDisplay">0,00 €</span>
-                </div>
-                <div class="flex justify-between text-xs text-slate-400">
-                    <span>frei verfügbar:</span>
-                    <span class="font-semibold" id="availableAfterReservationsDisplay">0,00 €</span>
+            <div id="periodBanner" class="backup-banner hidden">
+                <span class="backup-banner-text" id="periodBannerText"></span>
+                <div class="backup-banner-actions">
+                    <button class="knopf knopf--haupt knopf--klein" onclick="openModal('incomeModal')">Geld eintragen</button>
                 </div>
             </div>
+
+            <section id="statusCard" class="karte" aria-live="polite">
+                <div class="karte__kopf" style="margin-bottom:1rem;">
+                    <span class="marke" id="todayRemainingLabel">Verbleibend heute</span>
+                    <span id="statusBadge" class="chip" style="min-height:auto;padding:0.25rem 0.625rem;font-size:0.75rem;">Im Rahmen</span>
+                </div>
+
+                <div class="held__zahl" id="todayRemainingDisplay">0,00 €</div>
+
+                <!-- Zwei Spuren: Geld gegen Zeit. Der Reiter ist die Zeitmarke. -->
+                <div class="spur">
+                    <div class="spur__kopf">
+                        <span>Heute ausgegeben <b id="todaySpentDisplay">0,00 €</b></span>
+                        <span>Tagesbudget <b id="targetDailyDisplay">0,00 €</b></span>
+                    </div>
+                    <div class="spur__gleis">
+                        <div id="dailyProgressBar" class="spur__fuellung" style="width:0%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Anteil des heutigen Tagesbudgets"></div>
+                    </div>
+                </div>
+
+                <div class="spur">
+                    <div class="spur__kopf">
+                        <span>Periode: Geld verbraucht</span>
+                        <span><b id="periodeProzent">0 %</b></span>
+                    </div>
+                    <div class="spur__gleis">
+                        <div id="periodeBalken" class="spur__fuellung" style="width:0%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Anteil des Geldes der laufenden Periode"></div>
+                        <div id="periodeReiter" class="spur__reiter" style="left:0%" title="So weit ist die Zeit"></div>
+                    </div>
+                    <div class="spur__fuss">
+                        <span id="periodeZeitText">Zeit: 0 %</span>
+                        <span id="periodeUrteil"></span>
+                    </div>
+                </div>
+
+                <div class="naht"><span id="nahtText">Bis zum Geld</span></div>
+
+                <dl class="tempo" id="tempoBlock">
+                    <div>
+                        <dt>Dein Tempo</dt>
+                        <dd class="tempo__ist" id="tempoIst">–</dd>
+                    </div>
+                    <div>
+                        <dt>Nötig bis zum Geld</dt>
+                        <dd id="tempoSoll">–</dd>
+                    </div>
+                </dl>
+
+                <p class="tempo__folge" id="tempoFolge"></p>
+
+                <p id="statusMessage">Du bist heute gut im Rahmen.</p>
+            </section>
+
+            <div id="lobBand" class="lobband hidden" role="status">
+                <span class="lobband__glyphe" aria-hidden="true"></span>
+                <p class="lobband__text" id="lobBandText"></p>
+            </div>
+
+            <section id="musterKarte" class="muster hidden">
+                <span class="muster__marke">Muster</span>
+                <ul class="muster__liste" id="musterListe"></ul>
+            </section>
+
+            <!-- Bestand tritt bewusst zurück: Kontext, nicht Entscheidungszahl. -->
+            <section class="karte karte--still">
+                <div class="karte__kopf" style="margin-bottom:0.5rem;">
+                    <span class="marke">Bargeldbestand</span>
+                    <button class="knopf knopf--still knopf--klein" onclick="openModal('incomeModal')">+ Geld erhalten</button>
+                </div>
+                <div class="text-xl font-bold tabular-nums" id="totalCashDisplay">0,00 €</div>
+
+                <div class="pt-3 space-y-1.5" style="border-top:1px solid var(--linie-zart);margin-top:0.75rem;">
+                    <div class="text-xs text-slate-400">Bis zum Geld: <strong class="text-slate-200" id="daysUntilMoneyDisplay">--</strong> Tage</div>
+                    <div id="runwayDisplay">Noch keine Ausgaben erfasst</div>
+                </div>
+
+                <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
+                    <div class="flex justify-between text-xs text-slate-400">
+                        <span>davon eingeplant:</span>
+                        <span class="text-slate-200 font-semibold tabular-nums" id="reservedAmountDisplay">0,00 €</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-400">
+                        <span>frei verfügbar:</span>
+                        <span class="font-semibold tabular-nums" id="availableAfterReservationsDisplay">0,00 €</span>
+                    </div>
+                </div>
+            </section>
         </section>
 
-        <!-- Statuskarte: trägt die Entscheidungszahl und ist deshalb die Heldenkarte.
-             Die Zahl steht vor dem Balken, nicht dahinter. -->
-        <section id="statusCard" class="border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700" aria-live="polite">
-            <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center space-x-2">
-                    <span id="trafficLightDot" class="w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm"></span>
-                    <h2 class="font-bold text-base text-slate-100">Heute</h2>
-                </div>
-                <span id="statusBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Im Rahmen
-                </span>
-            </div>
+        <!-- ============================ MONAT ============================ -->
+        <section class="bildschirm" id="schirmMonat" role="tabpanel" aria-labelledby="tabMonat">
 
-            <div class="mb-4">
-                <div class="text-[11px] uppercase tracking-widest text-slate-400 mb-1">
-                    <span id="todayRemainingLabel">Verbleibend heute</span>
+            <section class="karte">
+                <div class="karte__kopf">
+                    <h2 class="karte__titel">Nach Kategorien</h2>
+                    <div class="flex gap-2 items-center">
+                        <button class="knopf knopf--still knopf--klein" onclick="openMonthReport(document.getElementById('categoryMonthSelect').value)">Abschluss</button>
+                        <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs" style="width:auto;min-height:2.75rem;padding:0.25rem 1.75rem 0.25rem 0.5rem;" aria-label="Monat für die Kategorieübersicht"></select>
+                    </div>
                 </div>
-                <div class="text-5xl font-extrabold tracking-tighter tabular-nums" id="todayRemainingDisplay" style="color: #10b981;">0,00 €</div>
-            </div>
+                <div id="categoryBreakdown" class="space-y-3"></div>
+            </section>
 
-            <!-- Progress Bar with remaining amount -->
-            <div class="space-y-1.5">
-                <div class="flex justify-between text-xs font-medium">
-                    <span class="text-slate-400">Ausgegeben: <span id="todaySpentDisplay" class="text-slate-200 font-bold tabular-nums">0,00 €</span></span>
-                    <span class="text-slate-400">Tagesbudget: <span id="targetDailyDisplay" class="text-slate-200 tabular-nums">0,00 €</span></span>
+            <section class="karte">
+                <div class="karte__kopf">
+                    <h2 class="karte__titel">Geplante Ausgaben</h2>
+                    <span class="text-xs font-semibold text-slate-300 tabular-nums" id="reservedSumDisplay">0,00 €</span>
                 </div>
-                <div class="w-full bg-slate-700/60 rounded-full h-3 overflow-hidden p-0.5">
-                    <div id="dailyProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+
+                <form id="reservationForm" onsubmit="handleAddReservation(event)" class="space-y-3 mb-4 pb-4" style="border-bottom:1px solid var(--linie-zart);">
+                    <input type="text" id="reservationLabel" placeholder="z. B. Tabak, Arzt …" aria-label="Bezeichnung der geplanten Ausgabe">
+                    <div class="flex gap-2">
+                        <input type="text" id="reservationAmount" inputmode="decimal" placeholder="10,00" class="flex-1" aria-label="Betrag der geplanten Ausgabe">
+                        <select id="reservationCategory" class="flex-1" aria-label="Kategorie der geplanten Ausgabe">
+                            <option value="">Kategorie</option>
+                            <option value="Haushalt/Essen">🛒 Essen</option>
+                            <option value="Tabak">🚬 Tabak</option>
+                            <option value="Reptilien">🦎 Reptilien</option>
+                            <option value="Privatkäufe">🛍️ Privatkäufe</option>
+                            <option value="Sonstiges">📦 Sonstiges</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="knopf knopf--haupt knopf--voll">Einplanen</button>
+                </form>
+
+                <div id="reservationsList" class="space-y-2">
+                    <p class="text-xs text-slate-400 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
                 </div>
-            </div>
-
-            <!-- Naht: ab hier wechselt die Zeitebene von "heute" auf "bis zum Zahltag".
-                 Ohne diese sichtbare Trennung wirken die beiden Zahlen wie zwei
-                 widersprüchliche Meinungen über dieselbe Sache. -->
-            <div class="naht"><span id="nahtText">Bis zum Geld</span></div>
-
-            <dl class="tempo" id="tempoBlock">
-                <div>
-                    <dt>Dein Tempo</dt>
-                    <dd class="tempo__ist" id="tempoIst">–</dd>
-                </div>
-                <div>
-                    <dt>Nötig bis zum Geld</dt>
-                    <dd id="tempoSoll">–</dd>
-                </div>
-            </dl>
-
-            <p class="tempo__folge" id="tempoFolge"></p>
-
-            <!-- Status Message -->
-            <p id="statusMessage" class="text-xs text-slate-400 mt-3 leading-relaxed">
-                Du bist heute gut im Rahmen. Spontane Zusatzkäufe vermeiden.
-            </p>
+            </section>
         </section>
 
-        <!-- Bestätigung für den Vortag. Steht bewusst NACH der Heldenkarte:
-             sie ist Rückmeldung, nicht Entscheidungsgrundlage. -->
-        <div id="lobBand" class="lobband hidden" role="status">
-            <span class="lobband__glyphe" aria-hidden="true"></span>
-            <p class="lobband__text" id="lobBandText"></p>
-        </div>
+        <!-- =========================== VERLAUF =========================== -->
+        <section class="bildschirm" id="schirmVerlauf" role="tabpanel" aria-labelledby="tabVerlauf">
+            <section class="karte">
+                <div class="karte__kopf">
+                    <h2 class="karte__titel">Letzte Bewegungen</h2>
+                    <span class="text-xs text-slate-400" id="txCount">0 Einträge</span>
+                </div>
 
-        <!-- Erkannte Muster. Bleibt vollständig verborgen, solange keines
-             seine Mindestdatenmenge erreicht – lieber leer als geraten. -->
-        <section id="musterKarte" class="muster hidden">
-            <span class="muster__marke">Muster</span>
-            <ul class="muster__liste" id="musterListe"></ul>
+                <div class="filter-chips">
+                    <button class="filter-chip active" onclick="setTxFilter('all')" aria-pressed="true">Alle</button>
+                    <button class="filter-chip" onclick="setTxFilter('expense')" aria-pressed="false">Ausgaben</button>
+                    <button class="filter-chip" onclick="setTxFilter('income')" aria-pressed="false">Einnahmen</button>
+                </div>
+
+                <div id="transactionList" class="space-y-2">
+                    <p class="text-xs text-slate-400 text-center py-4">Noch keine Buchungen vorhanden.</p>
+                </div>
+
+                <button id="moreBtn" class="more-btn hidden" onclick="loadMoreTransactions()">Mehr anzeigen</button>
+            </section>
         </section>
 
-        <!-- A7: Quick Expense Form (moved before reservations) -->
-        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
-            <h2 class="font-bold text-base text-slate-100 mb-3 flex items-center gap-2">
-                <span>⚡</span> Ausgabe buchen
-            </h2>
-
-            <!-- B4: Category Chips (horizontal scroll) -->
-            <div class="chip-row" id="categoryChips"></div>
-
-            <form id="expenseForm" onsubmit="handleAddExpense(event)" class="space-y-3">
-                <div>
-                    <label for="expenseAmount" class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
-                    <input type="text" id="expenseAmount" inputmode="decimal" placeholder="0,00" required
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500">
-                </div>
-
-                <div>
-                    <label for="expenseNote" class="block text-xs font-medium text-slate-400 mb-1">Notiz (Optional)</label>
-                    <input type="text" id="expenseNote" placeholder="z. B. Futtertiere, Supermarkt..."
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-sm focus:border-emerald-500">
-                </div>
-
-                <button type="submit"
-                    class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl shadow-lg transition-all active:scale-[0.99] text-sm">
-                    Ausgabe buchen
-                </button>
-            </form>
-        </section>
-
-        <!-- Reservations / Geplante Ausgaben Section -->
-        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="font-bold text-base text-slate-100 flex items-center gap-2">
-                    <span>📋</span> Geplante Ausgaben
-                </h2>
-                <span class="text-xs font-semibold text-slate-300 tabular-nums" id="reservedSumDisplay">0,00 €</span>
-            </div>
-
-            <!-- A6: Reservations Input Form (gestapelt) -->
-            <form id="reservationForm" onsubmit="handleAddReservation(event)" class="space-y-3 mb-4 pb-4 border-b border-slate-700/50">
-                <div>
-                    <input type="text" id="reservationLabel" placeholder="z.B. Tabak, Arzt..."
-                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-emerald-500 min-h-11" aria-label="Bezeichnung der geplanten Ausgabe">
-                </div>
-                <div class="flex gap-2">
-                    <input type="text" id="reservationAmount" inputmode="decimal" placeholder="10,00"
-                        class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-emerald-500 min-h-11" aria-label="Betrag der geplanten Ausgabe">
-                    <select id="reservationCategory" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-emerald-500 min-h-11" aria-label="Kategorie der geplanten Ausgabe">
-                        <option value="">Kategorie</option>
-                        <option value="Haushalt/Essen">🛒 Essen</option>
-                        <option value="Tabak">🚬 Tabak</option>
-                        <option value="Reptilien">🦎 Reptilien</option>
-                        <option value="Privatkäufe">🛍️ Privatkäufe</option>
-                        <option value="Sonstiges">📦 Sonstiges</option>
-                    </select>
-                </div>
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all active:scale-[0.99] min-h-11">
-                    Einplanen
-                </button>
-            </form>
-
-            <!-- Reservations List -->
-            <div id="reservationsList" class="space-y-2">
-                <p class="text-xs text-slate-400 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
-            </div>
-        </section>
-
-        <!-- Category Budget Breakdown -->
-        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
-            <div class="flex justify-between items-center mb-3 gap-2">
-                <h2 class="font-bold text-base text-slate-100">Ausgaben nach Kategorien</h2>
-                <div class="flex gap-2 items-center">
-                    <button onclick="openMonthReport(document.getElementById('categoryMonthSelect').value)" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1.5 rounded-lg font-medium transition-all">
-                        Details
-                    </button>
-                    <select id="categoryMonthSelect" onchange="renderUI()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300" aria-label="Monat für die Kategorieübersicht"></select>
-                </div>
-            </div>
-            <div id="categoryBreakdown" class="space-y-3"></div>
-        </section>
-
-        <!-- Recent Transactions with Filter Chips -->
-        <section class="bg-slate-800 border border-slate-700/60 rounded-2xl p-5 shadow-xl">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="font-bold text-base text-slate-100">Letzte Bewegungen</h2>
-                <span class="text-xs text-slate-400" id="txCount">0 Einträge</span>
-            </div>
-
-            <!-- B8: Filter Chips -->
-            <div class="filter-chips">
-                <button class="filter-chip active" onclick="setTxFilter('all')" aria-pressed="true">Alle</button>
-                <button class="filter-chip" onclick="setTxFilter('expense')" aria-pressed="false">Ausgaben</button>
-                <button class="filter-chip" onclick="setTxFilter('income')" aria-pressed="false">Einnahmen</button>
-            </div>
-
-            <!-- Transaction List -->
-            <div id="transactionList" class="space-y-2 max-h-96 overflow-y-auto pr-1">
-                <p class="text-xs text-slate-400 text-center py-4">Noch keine Buchungen vorhanden.</p>
-            </div>
-
-            <!-- B8: "More" button -->
-            <button id="moreBtn" class="more-btn hidden" onclick="loadMoreTransactions()">Mehr anzeigen</button>
+        <!-- ============================= MEHR ============================= -->
+        <section class="bildschirm" id="schirmMehr" role="tabpanel" aria-labelledby="tabMehr">
+            <section class="karte">
+                <h2 class="karte__titel mb-3">Einstellungen</h2>
+                <div id="mehrInhalt" class="space-y-1"></div>
+            </section>
         </section>
 
     </main>
 
-    <!-- B4: FAB (Floating Action Button) -->
-    <button class="fab" onclick="scrollToExpenseForm()" aria-label="Ausgabe buchen" title="Ausgabe buchen">
-        ⚡
-    </button>
+    <!-- Tableiste. Buchen sitzt in der Mitte und ist der größte Treffer. -->
+    <nav class="tableiste" role="tablist" aria-label="Bereiche">
+        <button class="tableiste__knopf" id="tabHeute" role="tab" aria-selected="true" aria-controls="schirmHeute" onclick="zeigeSchirm('Heute')">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>
+            <span>Heute</span>
+        </button>
+        <button class="tableiste__knopf" id="tabMonat" role="tab" aria-selected="false" aria-controls="schirmMonat" onclick="zeigeSchirm('Monat')">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg>
+            <span>Monat</span>
+        </button>
+        <button class="tableiste__buchen" onclick="oeffneBuchen()" aria-label="Ausgabe buchen">
+            <span aria-hidden="true">+</span>
+        </button>
+        <button class="tableiste__knopf" id="tabVerlauf" role="tab" aria-selected="false" aria-controls="schirmVerlauf" onclick="zeigeSchirm('Verlauf')">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V9M10 18V5M16 18v-6M20.5 18h-17"/></svg>
+            <span>Verlauf</span>
+        </button>
+        <button class="tableiste__knopf" id="tabMehr" role="tab" aria-selected="false" aria-controls="schirmMehr" onclick="zeigeSchirm('Mehr')">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>
+            <span>Mehr</span>
+        </button>
+    </nav>
 
-    <!-- Modal: Add Cash / Income (B6: aria + keyboard) -->
+    <!-- Buchungs-Sheet -->
+    <div id="buchenSheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="buchenTitel">
+        <div class="sheet__blatt">
+            <div class="sheet__griff" aria-hidden="true"></div>
+            <div class="sheet__kopf">
+                <h2 class="sheet__titel" id="buchenTitel">Ausgabe buchen</h2>
+                <button class="menu-btn" onclick="schliesseBuchen()" aria-label="Schließen">✕</button>
+            </div>
+
+            <div class="betrag betrag--leer" id="betragAnzeige" aria-live="polite">0,00 €</div>
+            <p class="betrag__hinweis" id="betragHinweis"></p>
+
+            <div class="chip-row" id="categoryChips"></div>
+
+            <form id="expenseForm" onsubmit="handleAddExpense(event)">
+                <!-- Das echte Feld bleibt im Markup, weil die Buchungslogik es
+                     liest. Sichtbar ist die große Anzeige darüber. -->
+                <input type="text" id="expenseAmount" inputmode="decimal" class="hidden" aria-hidden="true" tabindex="-1">
+
+                <div class="block" aria-label="Ziffernblock">
+                    <button type="button" onclick="ziffer('1')">1</button>
+                    <button type="button" onclick="ziffer('2')">2</button>
+                    <button type="button" onclick="ziffer('3')">3</button>
+                    <button type="button" onclick="ziffer('4')">4</button>
+                    <button type="button" onclick="ziffer('5')">5</button>
+                    <button type="button" onclick="ziffer('6')">6</button>
+                    <button type="button" onclick="ziffer('7')">7</button>
+                    <button type="button" onclick="ziffer('8')">8</button>
+                    <button type="button" onclick="ziffer('9')">9</button>
+                    <button type="button" class="block--weich" onclick="ziffer(',')">,</button>
+                    <button type="button" onclick="ziffer('0')">0</button>
+                    <button type="button" class="block--weich" onclick="ziffer('weg')" aria-label="Letzte Ziffer löschen">⌫</button>
+                </div>
+
+                <input type="text" id="expenseNote" placeholder="Notiz (optional)" class="mb-3">
+
+                <button type="submit" class="knopf knopf--haupt knopf--voll">Ausgabe buchen</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Bargeld erhalten -->
     <div id="incomeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="incomeModalTitle">
         <div class="modal-content">
             <h3 class="modal-header" id="incomeModalTitle">Bargeld erhalten</h3>
             <form onsubmit="handleAddIncome(event)" class="space-y-3">
                 <div>
-                    <label for="incomeAmount" class="block text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
-                    <input type="text" id="incomeAmount" inputmode="decimal" placeholder="50,00" required
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                    <label for="incomeAmount" class="block-d text-xs font-medium text-slate-400 mb-1">Betrag (€)</label>
+                    <input type="text" id="incomeAmount" inputmode="decimal" placeholder="50,00" required>
                 </div>
                 <div>
-                    <label for="incomeSource" class="block text-xs font-medium text-slate-400 mb-1">Quelle</label>
-                    <select id="incomeSource" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-200 text-sm focus:border-emerald-500">
+                    <label for="incomeSource" class="block-d text-xs font-medium text-slate-400 mb-1">Quelle</label>
+                    <select id="incomeSource">
                         <option value="Taschengeld Vater">Taschengeld Vater</option>
                         <option value="Arbeit/Nebenjob">Arbeit / Nebenjob</option>
                         <option value="Sonstiges Cash">Sonstiges Cash</option>
                     </select>
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="closeModal('incomeModal')"
-                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
-                        Abbrechen
-                    </button>
-                    <button type="submit"
-                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
-                        Hinzufügen
-                    </button>
+                    <button type="button" class="knopf knopf--still w-1/2" onclick="closeModal('incomeModal')">Abbrechen</button>
+                    <button type="submit" class="knopf knopf--haupt w-1/2">Hinzufügen</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Modal: Warning Alert (B6: aria + keyboard) -->
+    <!-- Modal: Warnung -->
     <div id="warningModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="warningTitle">
         <div class="modal-content">
-            <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30 mb-4">
-                ⚠️
-            </div>
+            <div class="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/30 mb-4">⚠️</div>
             <h3 class="modal-header text-center" id="warningTitle">Achtung: Tagesbudget erreicht!</h3>
-            <p class="text-xs text-slate-300 leading-relaxed mb-4 text-center" id="warningText">
+            <p class="text-sm text-slate-300 leading-relaxed mb-4 text-center" id="warningText">
                 Diese Ausgabe liegt über deinem geplanten Tagesbudget. Möchtest du sie trotzdem verbuchen?
             </p>
             <div class="flex gap-2 pt-2">
-                <button onclick="cancelPendingExpense()"
-                    class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
-                    Kauf stoppen
-                </button>
-                <button onclick="confirmPendingExpense()"
-                    class="w-1/2 bg-transparent border border-slate-600 text-slate-300 hover:bg-slate-700 py-2.5 rounded-xl text-sm font-medium">
-                    Trotzdem buchen
-                </button>
+                <button class="knopf knopf--haupt w-1/2" onclick="cancelPendingExpense()">Kauf stoppen</button>
+                <button class="knopf knopf--rand w-1/2" onclick="confirmPendingExpense()">Trotzdem buchen</button>
             </div>
         </div>
     </div>
 
-    <!-- B1: Settings Sheet Modal (B6: aria + keyboard) -->
+    <!-- Modal: Einstellungen -->
     <div id="settingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
         <div class="modal-content">
             <h3 class="modal-header" id="settingsModalTitle">Einstellungen</h3>
-            <div id="settingsSheetContent" class="space-y-1">
-                <!-- Items rendered dynamically by renderSettingsSheet() -->
-            </div>
+            <div id="settingsSheetContent" class="space-y-1"></div>
         </div>
     </div>
 
-    <!-- Kassensturz: Bestand mit der Wirklichkeit abgleichen -->
+    <!-- Modal: Kassensturz -->
     <div id="cashCountModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cashCountModalTitle">
         <div class="modal-content">
             <h3 class="modal-header" id="cashCountModalTitle">Bargeld nachzählen</h3>
             <form id="cashCountForm" onsubmit="saveCashCount(event)" class="space-y-3">
                 <div class="flex justify-between items-baseline">
                     <span class="text-xs text-slate-400">Laut App</span>
-                    <span class="text-base font-bold text-slate-100" id="cashCountExpected">0,00 €</span>
+                    <span class="text-base font-bold text-slate-100 tabular-nums" id="cashCountExpected">0,00 €</span>
                 </div>
                 <div>
-                    <label for="cashCountInput" class="block text-xs font-medium text-slate-400 mb-1">Tatsächlich gezählt (€)</label>
-                    <input type="text" id="cashCountInput" inputmode="decimal" placeholder="0,00" required
-                        oninput="updateCashCountDiff()"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                    <label for="cashCountInput" class="block-d text-xs font-medium text-slate-400 mb-1">Tatsächlich gezählt (€)</label>
+                    <input type="text" id="cashCountInput" inputmode="decimal" placeholder="0,00" required oninput="updateCashCountDiff()">
                 </div>
                 <p id="cashCountDiff" class="text-xs text-slate-400 leading-relaxed">Trage ein, wie viel Bargeld du tatsächlich hast.</p>
                 <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="closeModal('cashCountModal')"
-                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
-                        Abbrechen
-                    </button>
-                    <button type="submit"
-                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
-                        Übernehmen
-                    </button>
+                    <button type="button" class="knopf knopf--still w-1/2" onclick="closeModal('cashCountModal')">Abbrechen</button>
+                    <button type="submit" class="knopf knopf--haupt w-1/2">Übernehmen</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Payday & Stretch Modal (B6: aria + keyboard) -->
+    <!-- Modal: Geldeingang & Zeitraum -->
     <div id="paydayModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="paydayModalTitle">
         <div class="modal-content">
             <h3 class="modal-header" id="paydayModalTitle">Geldeingang & Zeitraum</h3>
             <form id="paydayForm" onsubmit="savePaydaySettings(event)" class="space-y-3">
                 <div>
-                    <label for="paydayInput" class="block text-xs font-medium text-slate-400 mb-1">Mein Geld kommt am … des Monats</label>
-                    <input type="number" id="paydayInput" min="1" max="28" required
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                    <label for="paydayInput" class="block-d text-xs font-medium text-slate-400 mb-1">Mein Geld kommt am … des Monats</label>
+                    <input type="number" id="paydayInput" min="1" max="28" required>
                 </div>
                 <div>
                     <div class="flex justify-between items-center mb-1">
-                        <label for="stretchInput" class="block text-xs font-medium text-slate-400">Ich strecke bis … (optional)</label>
-                        <button type="button" onclick="resetStretchDate()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-all">
-                            Zurücksetzen
-                        </button>
+                        <label for="stretchInput" class="block-d text-xs font-medium text-slate-400">Ich strecke bis … (optional)</label>
+                        <button type="button" class="knopf knopf--still knopf--klein" onclick="resetStretchDate()">Zurücksetzen</button>
                     </div>
-                    <input type="date" id="stretchInput"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                    <input type="date" id="stretchInput">
                 </div>
                 <p class="text-xs text-slate-400 leading-relaxed">Dein Tagesbudget wird auf die Tage bis dahin verteilt.</p>
                 <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="closeModal('paydayModal')"
-                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
-                        Abbrechen
-                    </button>
-                    <button type="submit"
-                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
-                        Speichern
-                    </button>
+                    <button type="button" class="knopf knopf--still w-1/2" onclick="closeModal('paydayModal')">Abbrechen</button>
+                    <button type="submit" class="knopf knopf--haupt w-1/2">Speichern</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- B7: Budget Modal (B6: aria + keyboard) -->
+    <!-- Modal: Kategorie-Budgets -->
     <div id="budgetModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle">
         <div class="modal-content">
             <h3 class="modal-header" id="budgetModalTitle">Kategorie-Budgets</h3>
             <form id="budgetForm" onsubmit="saveBudgets(event)" class="space-y-3">
-                <div id="budgetInputs" class="space-y-3">
-                    <!-- Inputs rendered dynamically -->
-                </div>
+                <div id="budgetInputs" class="space-y-3"></div>
                 <div class="flex gap-2 pt-2">
-                    <button type="button" onclick="closeModal('budgetModal')"
-                        class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
-                        Abbrechen
-                    </button>
-                    <button type="submit"
-                        class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
-                        Speichern
-                    </button>
+                    <button type="button" class="knopf knopf--still w-1/2" onclick="closeModal('budgetModal')">Abbrechen</button>
+                    <button type="submit" class="knopf knopf--haupt w-1/2">Speichern</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Month Report Modal (B6: aria + keyboard) -->
+    <!-- Modal: Monatsabschluss -->
     <div id="monthReportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="monthReportTitle">
-        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
+        <div class="modal-content" style="max-height:90vh;overflow-y:auto;">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="modal-header" id="monthReportTitle">Monatsabschluss</h3>
-                <select id="reportMonthSelect" onchange="renderMonthReport()" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300" aria-label="Monat für den Monatsabschluss"></select>
+                <h3 class="modal-header" id="monthReportTitle" style="margin-bottom:0;">Monatsabschluss</h3>
+                <select id="reportMonthSelect" onchange="renderMonthReport()" class="text-xs" style="width:auto;min-height:2.75rem;padding:0.25rem 1.75rem 0.25rem 0.5rem;" aria-label="Monat für den Monatsabschluss"></select>
             </div>
-            <div id="monthReportContent" class="space-y-4 mb-4">
-                <!-- Content rendered dynamically -->
-            </div>
-            <div class="flex gap-2 pt-2 border-t border-slate-700">
-                <button type="button" onclick="closeModal('monthReportModal')"
-                    class="w-1/2 bg-slate-700 hover:bg-slate-600 text-slate-200 py-2.5 rounded-xl text-sm font-medium">
-                    Schließen
-                </button>
-                <button type="button" onclick="shareMonthReport()"
-                    class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold">
-                    Übersicht teilen
-                </button>
+            <div id="monthReportContent" class="space-y-4 mb-4"></div>
+            <div class="flex gap-2 pt-2 border-t">
+                <button type="button" class="knopf knopf--still w-1/2" onclick="closeModal('monthReportModal')">Schließen</button>
+                <button type="button" class="knopf knopf--haupt w-1/2" onclick="shareMonthReport()">Übersicht teilen</button>
             </div>
         </div>
     </div>
 
-    <!-- Toast -->
-    <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-4 py-2.5 rounded-xl shadow-2xl opacity-0 pointer-events-none transition-opacity duration-300 z-[60]" role="status" aria-live="polite"></div>
-
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script>
         const STORAGE_KEY = 'cashControl_state_v2';
 
@@ -1120,11 +1410,9 @@
                 return;
             }
             if (aktion === 'expense') {
-                const feld = document.getElementById('expenseAmount');
-                if (feld) {
-                    feld.scrollIntoView({ behavior: 'auto', block: 'center' });
-                    feld.focus();
-                }
+                // Der Homescreen-Shortcut ist der schnellste Weg zum Buchen.
+                // Er landet jetzt direkt im Sheet statt irgendwo auf der Seite.
+                oeffneBuchen();
             } else if (aktion === 'income') {
                 openModal('incomeModal');
             }
@@ -2563,11 +2851,104 @@
             renderCategoryChips();
         }
 
-        // B4: FAB
-        function scrollToExpenseForm() {
-            const form = document.getElementById('expenseForm');
-            form.scrollIntoView({ behavior: 'smooth' });
-            document.getElementById('expenseAmount').focus();
+        /* ================================================================
+           Bildschirme, Sheet, Ziffernblock
+           ================================================================ */
+        const SCHIRME = ['Heute', 'Monat', 'Verlauf', 'Mehr'];
+        let aktiverSchirm = 'Heute';
+
+        function zeigeSchirm(name) {
+            if (!SCHIRME.includes(name)) return;
+            aktiverSchirm = name;
+            SCHIRME.forEach(n => {
+                const schirm = document.getElementById('schirm' + n);
+                const tab = document.getElementById('tab' + n);
+                if (schirm) schirm.setAttribute('data-aktiv', n === name ? 'ja' : 'nein');
+                if (tab) tab.setAttribute('aria-selected', n === name ? 'true' : 'false');
+            });
+            // Der Bereich "Mehr" traegt dieselben Eintraege wie das alte
+            // Menue. Erst beim Betreten fuellen, damit Stand und Anzeige
+            // nicht auseinanderlaufen.
+            if (name === 'Mehr') fuelleMehr();
+            window.scrollTo({ top: 0, behavior: 'auto' });
+        }
+
+        function fuelleMehr() {
+            const ziel = document.getElementById('mehrInhalt');
+            const quelle = document.getElementById('settingsSheetContent');
+            if (!ziel || !quelle) return;
+            renderSettingsSheet();
+            ziel.innerHTML = quelle.innerHTML;
+        }
+
+        // --- Buchungs-Sheet ---
+        let betragRoh = '';
+
+        function oeffneBuchen() {
+            betragRoh = '';
+            zeichneBetrag();
+            const notiz = document.getElementById('expenseNote');
+            if (notiz) notiz.value = '';
+            renderCategoryChips();
+            const sheet = document.getElementById('buchenSheet');
+            if (sheet) sheet.classList.add('sheet--offen');
+        }
+
+        function schliesseBuchen() {
+            const sheet = document.getElementById('buchenSheet');
+            if (sheet) sheet.classList.remove('sheet--offen');
+        }
+
+        function ziffer(taste) {
+            if (taste === 'weg') {
+                betragRoh = betragRoh.slice(0, -1);
+            } else if (taste === ',') {
+                if (!betragRoh.includes(',')) betragRoh += betragRoh === '' ? '0,' : ',';
+            } else {
+                // Nach dem Komma sind zwei Stellen genug, davor reichen sieben:
+                // groessere Betraege kommen bei Bargeld nicht vor und waeren
+                // eher ein Vertipper.
+                const [ganz, nach] = betragRoh.split(',');
+                if (betragRoh.includes(',')) {
+                    if ((nach || '').length >= 2) return;
+                } else if (ganz.length >= 7) {
+                    return;
+                }
+                if (betragRoh === '0') betragRoh = '';
+                betragRoh += taste;
+            }
+            zeichneBetrag();
+        }
+
+        function zeichneBetrag() {
+            const anzeige = document.getElementById('betragAnzeige');
+            const feld = document.getElementById('expenseAmount');
+            const hinweis = document.getElementById('betragHinweis');
+            if (feld) feld.value = betragRoh;
+            if (anzeige) {
+                anzeige.textContent = (betragRoh === '' ? '0,00' : betragRoh) + ' €';
+                anzeige.classList.toggle('betrag--leer', betragRoh === '');
+            }
+            if (!hinweis) return;
+
+            // Waehrend des Tippens zeigen, was die Buchung mit dem Tagesrest
+            // macht. Das ist der Moment, in dem die Entscheidung faellt –
+            // nicht die Meldung hinterher.
+            const betrag = parseAmount(betragRoh);
+            if (betragRoh === '' || isNaN(betrag) || betrag <= 0) {
+                hinweis.textContent = '';
+                hinweis.style.color = '';
+                return;
+            }
+            const limit = getDailyLimit();
+            const rest = limit - getTodaySpent() - betrag;
+            if (rest >= 0) {
+                hinweis.textContent = 'Danach bleiben dir heute ' + formatEuro(rest) + '.';
+                hinweis.style.color = '';
+            } else {
+                hinweis.textContent = 'Das sind ' + formatEuro(Math.abs(rest)) + ' über dem Tagesbudget.';
+                hinweis.style.color = 'var(--rot)';
+            }
         }
 
         // ---------- Expense Flow ----------
@@ -2630,6 +3011,11 @@
                 date: new Date().toISOString()
             };
             document.getElementById('expenseForm').reset();
+            // Ziffernblock leeren und Sheet schliessen – sonst steht der alte
+            // Betrag beim naechsten Oeffnen noch gross da.
+            betragRoh = '';
+            zeichneBetrag();
+            schliesseBuchen();
             bucheMitRuecknahme(tx, 'Ausgabe gebucht: ' + formatEuro(amount));
         }
 
@@ -2836,7 +3222,8 @@
                 totalCashEl.style.color = '#ef4444';
                 totalCashEl.innerText = formatEuro(Math.abs(totalCash)) + ' Schulden';
             } else {
-                totalCashEl.style.color = '#10b981';
+                // Auch hier neutral: der Bestand ist Kontext, keine Erfolgsmeldung.
+                totalCashEl.style.color = 'var(--text)';
                 totalCashEl.innerText = formatEuro(totalCash);
             }
 
@@ -2914,6 +3301,7 @@
             document.getElementById('reservedSumDisplay').innerText = formatEuro(reservedRemaining);
 
             updatePeriodBanner();
+            renderPeriodenSpur();
             renderTempoVergleich(dailyLimit);
             renderLobBand(dailyLimit);
             renderMuster();
@@ -2922,6 +3310,78 @@
             renderTransactions();
             renderReservations();
             updateBackupBanner();
+        }
+
+        /* ================================================================
+           Zwei Spuren: Geld gegen Zeit
+           ----------------------------------------------------------------
+           Der Widerspruch, ueber den sich die App beschwert hat, ist im Kern
+           einfach: das Tagesbudget teilt den Rest auf die Resttage und geht
+           deshalb IMMER auf, waehrend die Reichweite das bisherige Tempo
+           hochrechnet. Text allein hat das nicht aufgeloest. Hier steht es
+           als Bild: der Balken ist das Geld, der Reiter ist die Zeit. Liegt
+           die Fuellung rechts vom Reiter, ist mehr Geld weg als Zeit
+           vergangen – das ist das Tempoproblem, einen Blick lang.
+           ================================================================ */
+        function renderPeriodenSpur() {
+            const balken = document.getElementById('periodeBalken');
+            const reiter = document.getElementById('periodeReiter');
+            const prozentEl = document.getElementById('periodeProzent');
+            const zeitEl = document.getElementById('periodeZeitText');
+            const urteilEl = document.getElementById('periodeUrteil');
+            if (!balken || !reiter || !prozentEl || !zeitEl || !urteilEl) return;
+
+            const start = getPeriodStart().getTime();
+            const ende = getHorizonDate().getTime();
+            const jetzt = Date.now();
+
+            // Hier wird BRUTTO gerechnet, anders als beim Wochenfenster – und das
+            // ist Absicht. Der Zahltag liegt am Anfang der Periode, das Gehalt
+            // gehoert also zum Topf und nicht gegen die Ausgaben verrechnet.
+            // Netto gerechnet loeschte die Einnahme die Ausgaben aus und der
+            // Balken stand den ganzen Monat auf 0 %.
+            // Der Topf steckt bereits im Bestand: was weg ist plus was noch da
+            // ist, ergibt, was zur Verfuegung stand.
+            let ausgaben = 0;
+            for (const tx of appState.transactions) {
+                const zeit = new Date(tx.date).getTime();
+                if (!isFinite(zeit) || zeit < start || zeit > jetzt) continue;
+                if (tx.type === 'expense') ausgaben += Number(tx.amount) || 0;
+            }
+            const verbraucht = ausgaben;
+            const verfuegbar = verbraucht + Math.max(0, appState.totalCash);
+
+            const anteilGeld = verfuegbar > 0 ? Math.min(1, verbraucht / verfuegbar) : 0;
+            const spanne = ende - start;
+            const anteilZeit = spanne > 0 ? Math.min(1, Math.max(0, (jetzt - start) / spanne)) : 0;
+
+            balken.style.width = (anteilGeld * 100).toFixed(1) + '%';
+            balken.setAttribute('aria-valuenow', Math.round(anteilGeld * 100));
+            reiter.style.left = (anteilZeit * 100).toFixed(1) + '%';
+            prozentEl.innerText = Math.round(anteilGeld * 100) + ' %';
+            zeitEl.innerText = 'Zeit: ' + Math.round(anteilZeit * 100) + ' %';
+
+            // Der Abstand zwischen beiden Anteilen ist die eigentliche Aussage.
+            // Unter fuenf Punkten ist er Rauschen und wird nicht kommentiert –
+            // sonst schlaegt die App bei jeder Buchung einen Ton an.
+            const abstand = anteilGeld - anteilZeit;
+            if (verbraucht === 0) {
+                balken.style.backgroundColor = 'var(--gruen)';
+                urteilEl.innerText = '';
+                urteilEl.style.color = '';
+            } else if (abstand > 0.05) {
+                balken.style.backgroundColor = 'var(--rot)';
+                urteilEl.innerText = 'Geld läuft der Zeit voraus';
+                urteilEl.style.color = 'var(--rot)';
+            } else if (abstand < -0.05) {
+                balken.style.backgroundColor = 'var(--gruen)';
+                urteilEl.innerText = 'Du liegst vor dem Plan';
+                urteilEl.style.color = 'var(--gruen)';
+            } else {
+                balken.style.backgroundColor = 'var(--gruen)';
+                urteilEl.innerText = 'im Gleichschritt';
+                urteilEl.style.color = '';
+            }
         }
 
         // ---------- Soll gegen Ist ----------
@@ -3172,38 +3632,37 @@
 
             const shortfall = getReservationShortfall();
 
+            // Zustand als Attribut, nicht als Klassenkette. Die Karte, der Punkt
+            // und der Balken behalten so ihre Bauteilklassen – frueher wurden sie
+            // hier komplett ueberschrieben, was mit eigenem CSS alles wegraeumt.
+            function zustand(art, badgeText, text) {
+                statusCard.dataset.zustand = art;
+                dot.dataset.zustand = art;
+                badge.dataset.zustand = art;
+                progressBar.dataset.zustand = art;
+                badge.innerText = badgeText;
+                message.innerText = text;
+            }
+
             // A1: Leerzustand – kein roter Alarm beim ersten Start
             if (appState.transactions.length === 0) {
-                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700";
-                dot.className = "w-3.5 h-3.5 rounded-full bg-slate-500 inline-block shadow-sm";
-                badge.className = "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-700/50 text-slate-300 border border-slate-600";
-                badge.innerText = "Noch nichts erfasst";
-                message.innerText = "Trage zuerst ein, wie viel Bargeld du hast.";
+                zustand('leer', 'Noch nichts erfasst', 'Trage zuerst ein, wie viel Bargeld du hast.');
                 progressBar.style.width = "100%";
-                progressBar.className = "bg-slate-500 h-full rounded-full transition-all duration-500";
                 return;
             }
 
             // B3: Reservation shortfall – geplante Ausgaben übersteigen Bargeld
             if (shortfall > 0) {
-                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/50 border-red-500/70 ring-2 ring-red-500/25";
-                dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
-                badge.className = "text-sm font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/30";
-                badge.innerText = "Unterdeckung";
-                message.innerText = `Deine geplanten Ausgaben übersteigen dein Bargeld um ${formatEuro(shortfall)}.`;
-                progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
+                zustand('alarm', 'Unterdeckung',
+                    `Deine geplanten Ausgaben übersteigen dein Bargeld um ${formatEuro(shortfall)}.`);
                 progressBar.style.width = "0%";
                 return;
             }
 
             // B3: Bei Bestand ≤ 0
             if (totalCash <= 0) {
-                statusCard.className = "border rounded-2xl p-5 shadow-lg transition-all-200 bg-red-950/50 border-red-500/70 ring-2 ring-red-500/25";
-                dot.className = "w-3.5 h-3.5 rounded-full bg-red-500 inline-block shadow-sm animate-pulse";
-                badge.className = "text-sm font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/30";
-                badge.innerText = "Kein Bargeld";
-                message.innerText = `Bestand 0,00 €. Bis zum Geld sind es noch ${getDaysUntilHorizon()} Tage.`;
-                progressBar.className = "bg-red-500 h-full rounded-full transition-all duration-500";
+                zustand('alarm', 'Kein Bargeld',
+                    `Bestand 0,00 €. Bis zum Geld sind es noch ${getDaysUntilHorizon()} Tage.`);
                 progressBar.style.width = "0%";
                 return;
             }
@@ -3248,30 +3707,8 @@
                     ? `Noch ${formatEuro(Math.max(0, restHeute))} für heute.`
                     : `Noch ${formatEuro(Math.max(0, restHeute))} für heute. Das Bargeld reicht bei deinem Schnitt ${flug.reichweite} Tage.`);
 
-            // Feste Klassenketten statt interpolierter Farbnamen: dynamisch gebaute
-            // Tailwind-Klassen fehlen im Fallback-CSS und brechen still.
             function setStatus(art, badgeText, text) {
-                const stile = {
-                    ok: {
-                        karte: "border rounded-2xl p-5 shadow-lg transition-all-200 bg-slate-800 border-slate-700",
-                        punkt: "w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm",
-                        badge: "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-                        balken: "bg-emerald-500 h-full rounded-full transition-all duration-500"
-                    },
-                    warn: {
-                        karte: "border rounded-2xl p-5 shadow-lg transition-all-200 bg-amber-950/30 border-amber-500/60",
-                        punkt: "w-3.5 h-3.5 rounded-full bg-amber-400 inline-block shadow-sm",
-                        badge: "text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20",
-                        balken: "bg-amber-500 h-full rounded-full transition-all duration-500"
-                    }
-                };
-                const s = stile[art] || stile.ok;
-                statusCard.className = s.karte;
-                dot.className = s.punkt;
-                badge.className = s.badge;
-                badge.innerText = badgeText;
-                message.innerText = text;
-                progressBar.className = s.balken;
+                zustand(art === 'warn' ? 'warn' : 'ok', badgeText, text);
             }
         }
 
