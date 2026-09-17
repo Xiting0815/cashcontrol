@@ -376,6 +376,14 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .tempo__folge b { color: var(--text); font-weight: 700; }
 .tempo__folge:empty { display: none; }
 
+.tempo__grundlage {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--text-4);
+    margin-top: 0.5rem;
+}
+.tempo__grundlage:empty { display: none; }
+
 .lobband {
     display: flex;
     align-items: flex-start;
@@ -972,7 +980,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 <div class="spur">
                     <div class="spur__kopf">
                         <span>Heute ausgegeben <b id="todaySpentDisplay">0,00 €</b></span>
-                        <span>Tagesbudget <b id="targetDailyDisplay">0,00 €</b></span>
+                        <span>Tagessatz <b id="targetDailyDisplay">0,00 €</b></span>
                     </div>
                     <div class="spur__gleis">
                         <div id="dailyProgressBar" class="spur__fuellung" style="width:0%" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Anteil des heutigen Tagesbudgets"></div>
@@ -1002,12 +1010,18 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                         <dd class="tempo__ist" id="tempoIst">–</dd>
                     </div>
                     <div>
-                        <dt>Nötig bis zum Geld</dt>
+                        <dt>Dein Tagessatz</dt>
                         <dd id="tempoSoll">–</dd>
                     </div>
                 </dl>
 
                 <p class="tempo__folge" id="tempoFolge"></p>
+
+                <!-- Die Rechnung offenlegen. Wer 430 € durch 14 Tage teilt, kommt
+                     auf 30,71 € und haelt die App fuer kaputt. Der Tagessatz geht
+                     vom Stand heute frueh aus – sonst schrumpfte er bei jeder
+                     Buchung. Diese Zeile macht das nachrechenbar. -->
+                <p class="tempo__grundlage" id="tempoGrundlage"></p>
 
                 <p id="statusMessage">Du bist heute gut im Rahmen.</p>
             </section>
@@ -3404,6 +3418,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             naht.innerText = `Bis zum Geld · noch ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`;
 
             sollEl.innerHTML = `${formatEuro(dailyLimit)}<i> /Tag</i>`;
+            renderTempoGrundlage(dailyLimit);
 
             if (flug.status === 'unbekannt' || !(flug.schnitt > 0)) {
                 istEl.innerHTML = `<i>noch keine Ausgaben</i>`;
@@ -3429,6 +3444,60 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                     ? `Dein Tempo trägt <b>${puffer} ${puffer === 1 ? 'Tag' : 'Tage'}</b> über den Zahltag hinaus.`
                     : `Dein Tempo trägt genau bis zum Zahltag.`;
             }
+        }
+
+        /* ================================================================
+           Die Rechnung hinter dem Tagessatz
+           ----------------------------------------------------------------
+           Der Tagessatz geht vom Bestand am TAGESANFANG aus, nicht vom Stand
+           in diesem Moment (siehe getDailyLimit: + getTodaySpent()). Das ist
+           Absicht, sonst saenke der Satz mit jeder Buchung und ein Einkauf
+           von 9 EUR wuerde den Tagesrest um mehr als 9 EUR druecken.
+
+           Die Folge: Bestand geteilt durch Resttage ergibt NICHT den
+           angezeigten Satz, und wer nachrechnet, haelt die App fuer kaputt.
+           Genau das ist passiert. Diese Zeile legt den Rechenweg offen, und
+           zwar mit Zahlen, die auf demselben Bildschirm stehen:
+
+               Bestand − Rest für heute − Eingeplantes = Satz × (Tage − 1)
+
+           Das ist keine Schaetzung, sondern eine Identitaet: wer heute genau
+           seinen Satz ausschoepft, hat morgen exakt wieder denselben Satz.
+           ================================================================ */
+        function renderTempoGrundlage(dailyLimit) {
+            const el = document.getElementById('tempoGrundlage');
+            if (!el) return;
+
+            const tage = getDaysUntilHorizon();
+            const bestand = appState.totalCash;
+            const eingeplant = getReservedRemaining();
+            const restHeute = dailyLimit - getTodaySpent();
+
+            if (!(bestand > 0) || tage < 1) { el.innerText = ''; return; }
+
+            if (tage === 1) {
+                el.innerText = `Grundlage: ${formatEuro(bestand)} für heute – morgen kommt Geld.`;
+                return;
+            }
+
+            const spaeter = tage - 1;
+
+            // Ist der Tagessatz heute schon aufgebraucht, waere die Zeile
+            // "davon X für heute" mit einem negativen X. Dann lieber den Satz
+            // zeigen, der ab morgen tatsaechlich gilt.
+            if (restHeute <= 0) {
+                const abMorgen = Math.max(0, bestand - eingeplant) / spaeter;
+                el.innerText = `Grundlage: Heute ist dein Satz aufgebraucht. `
+                    + `${formatEuro(Math.max(0, bestand - eingeplant))} auf die ${spaeter} Tage ab morgen `
+                    + `sind ${formatEuro(abMorgen)} pro Tag.`;
+                return;
+            }
+
+            const rest = bestand - restHeute - eingeplant;
+            const teile = [`${formatEuro(bestand)} Bestand`, `${formatEuro(restHeute)} für heute`];
+            if (eingeplant > 0) teile.push(`${formatEuro(eingeplant)} eingeplant`);
+            el.innerText = `Grundlage: ${teile.join(' − ')} = ${formatEuro(rest)} `
+                + `auf die ${spaeter} ${spaeter === 1 ? 'Tag' : 'Tage'} danach.`;
         }
 
         // ---------- Bestätigung für den Vortag ----------
