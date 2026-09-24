@@ -1410,6 +1410,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             }
             setupModalKeyboard();
             ueberwacheTageswechsel();
+            beobachteAndereFenster();
             registerServiceWorker();
         });
 
@@ -1499,19 +1500,148 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         }
 
         // ---------- Storage ----------
+        /* ================================================================
+           Mehrere offene Fenster
+           ----------------------------------------------------------------
+           Jedes Fenster haelt appState im Arbeitsspeicher und schrieb ihn
+           beim Buchen VOLLSTAENDIG zurueck. Zwei offene Fenster loeschten
+           sich damit gegenseitig die Buchungen:
+
+               Beide sehen 500 EUR.
+               Fenster A bucht 30  -> Speicher 470.
+               Fenster B kennt nur die alten 500 und bucht 10
+                                   -> Speicher 490. Die 30 sind weg.
+
+           Ohne jede Meldung, und Fenster A zeigte weiter 470 an - eine
+           Zahl, die es im Speicher nicht mehr gab. Auf dem Handy passiert
+           das leicht: die App liegt in mehreren Tabs offen.
+
+           basisText haelt fest, wie der Speicher beim letzten Lesen oder
+           Schreiben aussah. Weicht er davon ab, hat ein anderes Fenster
+           geschrieben, und es wird abgeglichen statt ueberschrieben.
+           ================================================================ */
+        let basisText = null;
+
+        // Gleicht zwei auseinandergelaufene Staende ab. Grundlage ist der
+        // gemeinsame Ausgangspunkt: was WIR seither hinzugefuegt oder
+        // entfernt haben, wird auf den fremden Stand angewandt. Alles
+        // andere bleibt so, wie das andere Fenster es hinterlassen hat.
+        function mischeStaende(basis, fremd, unser) {
+            const gleich = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+            function liste(feld) {
+                const basisListe = Array.isArray(basis[feld]) ? basis[feld] : [];
+                const fremdListe = Array.isArray(fremd[feld]) ? fremd[feld] : [];
+                const unserListe = Array.isArray(unser[feld]) ? unser[feld] : [];
+
+                const basisIds = new Set(basisListe.map(x => x && x.id));
+                const unserIds = new Set(unserListe.map(x => x && x.id));
+
+                const vonUnsNeu = unserListe.filter(x => x && !basisIds.has(x.id));
+                const vonUnsWeg = new Set(basisListe.filter(x => x && !unserIds.has(x.id)).map(x => x.id));
+
+                // Fremder Stand als Grundlage, unsere Loeschungen darauf anwenden
+                const ergebnis = fremdListe.filter(x => x && !vonUnsWeg.has(x.id));
+
+                // Unsere Aenderungen an Eintraegen, die es schon gab
+                // (z.B. eine abgehakte Reservierung)
+                for (const x of unserListe) {
+                    if (!x || !basisIds.has(x.id)) continue;
+                    const alt = basisListe.find(y => y && y.id === x.id);
+                    if (gleich(alt, x)) continue;
+                    const i = ergebnis.findIndex(y => y && y.id === x.id);
+                    if (i >= 0) ergebnis[i] = x;
+                }
+
+                // Unsere neuen Eintraege ergaenzen
+                const vorhanden = new Set(ergebnis.map(x => x && x.id));
+                for (const x of vonUnsNeu) if (!vorhanden.has(x.id)) ergebnis.push(x);
+
+                return ergebnis;
+            }
+
+            function objekt(feld) {
+                const b = (basis[feld] && typeof basis[feld] === 'object') ? basis[feld] : {};
+                const f = (fremd[feld] && typeof fremd[feld] === 'object') ? fremd[feld] : {};
+                const u = (unser[feld] && typeof unser[feld] === 'object') ? unser[feld] : {};
+                const r = Object.assign({}, f);
+                for (const k of Object.keys(u)) if (!gleich(u[k], b[k])) r[k] = u[k];
+                for (const k of Object.keys(b)) if (!(k in u)) delete r[k];
+                return r;
+            }
+
+            const gemischt = Object.assign({}, fremd, unser, {
+                transactions: liste('transactions'),
+                reservations: liste('reservations'),
+                budgets: objekt('budgets'),
+                settings: objekt('settings')
+            });
+            // Neueste zuerst, wie die App es ueberall erwartet
+            gemischt.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return gemischt;
+        }
+
         function saveToStorage() {
             if (ladeFehler) {
                 showToast('Es wird nichts gespeichert, solange die alten Daten nicht lesbar sind.');
                 return false;
             }
+
+            let abgeglichen = false;
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-                return true;
+                const imSpeicher = localStorage.getItem(STORAGE_KEY);
+                // Hat jemand anders geschrieben, seit wir gelesen haben?
+                if (basisText !== null && imSpeicher !== null && imSpeicher !== basisText) {
+                    let fremd = null;
+                    try { fremd = JSON.parse(imSpeicher); } catch (e) { fremd = null; }
+                    if (fremd && Array.isArray(fremd.transactions)) {
+                        const basis = JSON.parse(basisText);
+                        appState = mischeStaende(basis, fremd, appState);
+                        recomputeTotalCash();
+                        abgeglichen = true;
+                    }
+                    // Unlesbarer fremder Stand: unserer ist der bessere,
+                    // also schreiben wir ihn.
+                }
+            } catch (e) {
+                console.error('Abgleich mit anderem Fenster fehlgeschlagen:', e);
+                // Lieber ohne Abgleich speichern als die Buchung verlieren.
+            }
+
+            try {
+                const text = JSON.stringify(appState);
+                localStorage.setItem(STORAGE_KEY, text);
+                basisText = text;
             } catch (e) {
                 console.error('Speichern fehlgeschlagen:', e);
                 showToast('Nicht gespeichert – Speicher voll. Die Buchung wurde verworfen.');
                 return false;
             }
+
+            if (abgeglichen) {
+                // Der Nutzer muss erfahren, dass sich die Zahl gerade wegen
+                // eines anderen Fensters geaendert hat - sonst wirkt sie falsch.
+                try { populateMonthSelect(); renderUI(); } catch (e) { /* Anzeige folgt spaeter */ }
+                showToast('Buchung aus einem anderen Fenster übernommen.');
+            }
+            return true;
+        }
+
+        // Schreibt ein anderes Fenster, uebernimmt dieses den neuen Stand
+        // sofort. Sonst rechnet es weiter mit Zahlen, die es nicht mehr gibt.
+        function beobachteAndereFenster() {
+            window.addEventListener('storage', (e) => {
+                if (e.key !== STORAGE_KEY || e.newValue === null) return;
+                if (e.newValue === basisText) return;
+                if (ladeFehler) return;
+                let fremd = null;
+                try { fremd = JSON.parse(e.newValue); } catch (err) { return; }
+                if (!fremd || !Array.isArray(fremd.transactions)) return;
+                appState = fremd;
+                basisText = e.newValue;
+                recomputeTotalCash();
+                try { populateMonthSelect(); renderUI(); } catch (err) { /* nicht abschiessen */ }
+            });
         }
 
         // Eine Buchung, die nicht auf die Platte kam, darf nicht auf dem Schirm stehen
@@ -1558,6 +1688,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 return;
             }
             appState = parsed;
+            basisText = saved;
             recomputeTotalCash();
         }
 
