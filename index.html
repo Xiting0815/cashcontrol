@@ -1445,6 +1445,30 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
           return deferredInstallPrompt !== null;
         }
 
+        // Laeuft die App in einem eigenen Fenster oder in einem Browser-Tab?
+        // Im Tab stapeln sich die Fenster bei jedem Start ueber das Symbol.
+        function istAlsAppInstalliert() {
+            try {
+                return window.matchMedia('(display-mode: standalone)').matches
+                    || window.navigator.standalone === true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function zeigeInstallationsWeg() {
+            alert(
+                'Die App läuft gerade in einem Browser-Tab.\n\n'
+                + 'So bekommt sie ein eigenes Fenster:\n\n'
+                + '1. Oben rechts in Chrome auf die drei Punkte tippen.\n'
+                + '2. "App installieren" wählen (steht je nach Version auch als '
+                + '"Zum Startbildschirm hinzufügen" da).\n'
+                + '3. Das alte Symbol vom Startbildschirm entfernen und das neue benutzen.\n\n'
+                + 'Erkennen kannst du es daran, dass die Adresszeile oben verschwindet.\n\n'
+                + 'Deine Daten bleiben dabei erhalten – es ist dieselbe App.'
+            );
+        }
+
         function triggerInstallPrompt() {
           if (!deferredInstallPrompt) {
             showToast('App-Installation wird nicht unterstützt.');
@@ -4375,11 +4399,21 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 `;
             }
 
-            // Install (conditional)
+            // Einrichten als echte App. Der Eintrag stand bisher nur da, wenn
+            // Chrome von sich aus einen Installationsvorschlag anbot – wer den
+            // Moment verpasst hat, fand den Weg nie wieder. Ein Lesezeichen auf
+            // dem Startbildschirm oeffnet jedes Mal einen neuen Browser-Tab;
+            // eine installierte App bekommt ein eigenes Fenster.
             if (canInstallApp()) {
                 html += `
                     <button class="settings-sheet-item" onclick="triggerInstallPrompt(); closeModal('settingsModal');">
-                        App installieren
+                        Als App installieren
+                    </button>
+                `;
+            } else if (!istAlsAppInstalliert()) {
+                html += `
+                    <button class="settings-sheet-item" onclick="zeigeInstallationsWeg();">
+                        Als App einrichten
                     </button>
                 `;
             }
