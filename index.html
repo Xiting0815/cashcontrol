@@ -618,6 +618,31 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .res--erledigt .res__haken { background-color: rgba(52, 211, 153, 0.2); color: var(--gruen); }
 .res--erledigt .res__haken:hover { background-color: rgba(52, 211, 153, 0.3); }
 
+/* Ersparnis. Der einzige Posten, der waechst, wenn man nichts tut -
+   deshalb bekommt er den gruenen Akzent, den sonst nichts mehr traegt. */
+.ersparnis {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--linie-zart);
+}
+.ersparnis__marke {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gruen);
+}
+.ersparnis__wert {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--gruen);
+    font-variant-numeric: tabular-nums;
+}
+
 /* ========================================================================
    8. Modale und Buchungs-Sheet
    ===================================================================== */
@@ -1042,6 +1067,14 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                         <span>frei verfügbar:</span>
                         <span class="font-semibold tabular-nums" id="availableAfterReservationsDisplay">0,00 €</span>
                     </div>
+                </div>
+
+                <!-- Ersparnis als eigener Posten. Sie wird nicht auf die
+                     Resttage verteilt, also gehoert sie auch nicht in den
+                     Tagessatz, sondern sichtbar daneben. -->
+                <div id="ersparnisZeile" class="ersparnis hidden">
+                    <span class="ersparnis__marke">Erspart diese Periode</span>
+                    <span class="ersparnis__wert" id="ersparnisWert">0,00 €</span>
                 </div>
             </section>
         </section>
@@ -2490,10 +2523,81 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             return count;
         }
 
+        /* ================================================================
+           Ersparnis bleibt aussen vor
+           ----------------------------------------------------------------
+           Vorher war der Tagessatz schlicht Bestand geteilt durch Resttage.
+           Das bestraft Sparsamkeit: wer taeglich 20 statt der geplanten
+           29 EUR ausgibt, bekommt am 20. einen Satz von 43 EUR und am
+           letzten Tag 300 EUR angeboten. Die App forderte also umso
+           lauter zum Ausgeben auf, je diszipliniert man war - das
+           Gegenteil ihres Zwecks.
+
+           Jetzt steigt der Satz nicht ueber das, was zu Periodenbeginn
+           geplant war. Was darueber hinaus da ist, gilt als Ersparnis und
+           wird nicht wieder auf die Resttage verteilt.
+
+           Nach UNTEN wirkt die Grenze nicht: wer zu viel ausgegeben hat,
+           bekommt weiterhin den kleineren Satz, sonst reicht das Geld
+           nicht bis zum Zahltag.
+           ================================================================ */
+
+        // Was ist in dieser Periode an Geld hereingekommen? Daran haengt der
+        // Plan - NICHT am Bestand. Der Unterschied zeigt sich am Monatswechsel:
+        // Wer 280 EUR aus dem Vormonat uebrig hat, bekaeme bei einer Rechnung
+        // ueber den Bestand einen hoeheren Tagessatz und gaebe das Ersparte
+        // doch noch aus, nur einen Monat spaeter. Ueber die Einnahmen gerechnet
+        // bleibt es liegen und waechst weiter.
+        function getPeriodenEinnahmen() {
+            const start = getPeriodStart().getTime();
+            const jetzt = Date.now();
+            let einnahmen = 0;
+            for (const tx of appState.transactions) {
+                const zeit = new Date(tx.date).getTime();
+                if (!isFinite(zeit) || zeit < start || zeit > jetzt) continue;
+                if (tx.type === 'income') einnahmen += Number(tx.amount) || 0;
+            }
+            return Math.max(0, einnahmen);
+        }
+
+        function getPeriodenTage() {
+            const start = getPeriodStart().getTime();
+            const ende = getHorizonDate().getTime();
+            if (!isFinite(start) || !isFinite(ende)) return 1;
+            return Math.max(1, Math.min(400, Math.round((ende - start) / 86400000)));
+        }
+
+        // Der Satz, der zu Periodenbeginn fuer die ganze Periode gedacht war.
+        // Null, wenn noch keine Einnahme erfasst ist - dann greift der Deckel
+        // nicht, und die App rechnet wie vorher. Lieber keine Grenze als eine
+        // aus der Luft gegriffene.
+        function getGeplanterSatz() {
+            const einnahmen = getPeriodenEinnahmen();
+            if (!(einnahmen > 0)) return 0;
+            return Math.max(0, einnahmen - getReservedRemaining()) / getPeriodenTage();
+        }
+
         function getDailyLimit() {
             const days = Math.max(1, getDaysUntilHorizon());
             const verfuegbar = appState.totalCash + getTodaySpent() - getReservedRemaining();
-            return Math.max(0, verfuegbar) / days;
+            const satz = Math.max(0, verfuegbar) / days;
+            const geplant = getGeplanterSatz();
+            // Nur nach oben deckeln. Nach unten muss der Satz frei sein.
+            return geplant > 0 ? Math.min(satz, geplant) : satz;
+        }
+
+        // Was ueber dem liegt, was die Resttage zum Tagessatz brauchen.
+        // Gerechnet auf denselben Stand wie der Tagessatz: Tagesanfang.
+        function getErsparnis() {
+            const tage = Math.max(1, getDaysUntilHorizon());
+            const verfuegbar = appState.totalCash + getTodaySpent() - getReservedRemaining();
+            return Math.max(0, verfuegbar - getDailyLimit() * tage);
+        }
+
+        // Wie weit traegt die Ersparnis eine Ueberschreitung von heute?
+        // Solange sie reicht, wird nicht gewarnt - so war es gewuenscht.
+        function ueberschreitungGedeckt(betrag) {
+            return betrag <= getErsparnis() + 0.005;
         }
 
         // 10 statt 7 Tage: Ein einzelner ausgabearmer/starker Wochenendtag
@@ -3162,16 +3266,20 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // jedem Wocheneinkauf und trainiert das Wegklicken an.
             const wochenTopf = getWeeklyBudget();
             const wocheAusgegeben = getWeekSpent();
+            const ueberWoche = (wocheAusgegeben + amount) - wochenTopf;
 
+            // Deckt die Ersparnis die Ueberschreitung, wird nicht gewarnt.
+            // Erspartes Geld ist dafuer da, auch mal mehr ausgeben zu koennen -
+            // eine Warnung waere hier eine Strafe fuers Sparen.
             if (wochenTopf > 0 && amount >= getWeeklyWarnMinimum()
-                && (wocheAusgegeben + amount) > wochenTopf + 0.005) {
+                && ueberWoche > 0.005 && !ueberschreitungGedeckt(ueberWoche)) {
                 pendingExpense = { amount, category: selectedCategory, note, overBudget: 'weekly' };
                 document.getElementById('warningTitle').innerText = 'Das sprengt die Woche';
 
-                const ueber = (wocheAusgegeben + amount) - wochenTopf;
+                const ueber = ueberWoche - getErsparnis();
                 const daysLeft = getDaysUntilHorizon();
                 const newDailyLimit = Math.max(0, (appState.totalCash - amount - getReservedRemaining())) / Math.max(1, daysLeft - 1);
-                const warningText = `${formatEuro(ueber)} über dem, was diese Woche vorgesehen war. <span class="font-semibold text-amber-300">Bis zum Geld bleiben dir dann ${formatEuro(newDailyLimit)} pro Tag für ${daysLeft - 1} Tage.</span>`;
+                const warningText = `${formatEuro(ueber)} über dem, was diese Woche vorgesehen war – auch nach Abzug deiner Ersparnis. <span class="font-semibold text-amber-300">Bis zum Geld bleiben dir dann ${formatEuro(newDailyLimit)} pro Tag für ${daysLeft - 1} Tage.</span>`;
                 document.getElementById('warningText').innerHTML = warningText;
 
                 openModal('warningModal');
@@ -3468,13 +3576,30 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // A2: Remaining for today - darf negativ werden, mit dynamischem Label und Farbe
             const todayRemaining = dailyLimit - todaySpent;
             const isNegative = todayRemaining < 0;
-            document.getElementById('todayRemainingLabel').innerText = isNegative ? 'Über Ziel' : 'Verbleibend heute';
+            // Ist die Ueberschreitung von der Ersparnis gedeckt, ist sie kein
+            // Fehltritt – dann darf die Zahl auch nicht wie einer aussehen.
+            const ausErsparnis = isNegative && ueberschreitungGedeckt(-todayRemaining);
+            document.getElementById('todayRemainingLabel').innerText =
+                isNegative ? (ausErsparnis ? 'Aus der Ersparnis' : 'Über Ziel') : 'Verbleibend heute';
             document.getElementById('todayRemainingDisplay').innerText = formatEuro(isNegative ? -todayRemaining : todayRemaining);
             // Neutralweiß statt Grün im Normalfall. Die App war zu rund 90 % grün –
             // Bestand, Heldenzahl, Knöpfe, Punkt. Wenn Grün fast alles bedeutet,
             // bedeutet es nichts mehr, und eine rote Zeile wirkt wie ein Fehler
             // statt wie eine Aussage. Grün bleibt dem Zugewinn vorbehalten.
-            document.getElementById('todayRemainingDisplay').style.color = isNegative ? '#ff8a8a' : '#f2f5f8';
+            document.getElementById('todayRemainingDisplay').style.color =
+                (isNegative && !ausErsparnis) ? '#ff8a8a' : '#f2f5f8';
+
+            // Ersparnis sichtbar machen
+            const ersparnis = getErsparnis();
+            const ersparnisZeile = document.getElementById('ersparnisZeile');
+            if (ersparnisZeile) {
+                if (ersparnis > 0.005) {
+                    ersparnisZeile.classList.remove('hidden');
+                    document.getElementById('ersparnisWert').innerText = formatEuro(ersparnis);
+                } else {
+                    ersparnisZeile.classList.add('hidden');
+                }
+            }
 
             // Reservations sum display
             document.getElementById('reservedSumDisplay').innerText = formatEuro(reservedRemaining);
@@ -3639,6 +3764,17 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             const restHeute = dailyLimit - getTodaySpent();
 
             if (!(bestand > 0) || tage < 1) { el.innerText = ''; return; }
+
+            // Greift die Deckelung, stimmt die alte Rechnung nicht mehr:
+            // Bestand minus Tagesrest geteilt durch die Resttage ergaebe den
+            // UNGEDECKELTEN Satz. Dann muss hier der echte Weg stehen,
+            // sonst ist die Zeile wieder das, was sie heilen sollte.
+            const ersparnis = getErsparnis();
+            if (ersparnis > 0.005) {
+                el.innerText = `Grundlage: ${formatEuro(dailyLimit)} pro Tag – so viel war für die ganze Periode geplant. `
+                    + `Deine Ersparnis von ${formatEuro(ersparnis)} bleibt außen vor und wird nicht mitverteilt.`;
+                return;
+            }
 
             if (tage === 1) {
                 el.innerText = `Grundlage: ${formatEuro(bestand)} für heute – morgen kommt Geld.`;
@@ -3922,8 +4058,16 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 return;
             }
             if (spent > limit && limit > 0) {
+                const drueber = spent - limit;
+                // Aus der Ersparnis gedeckt: dann ist das kein Fehltritt,
+                // sondern genau wofuer das zurueckgelegte Geld da ist.
+                if (ueberschreitungGedeckt(drueber)) {
+                    setStatus('ok', 'Aus der Ersparnis',
+                        `${formatEuro(drueber)} über dem Tagessatz – aus deiner Ersparnis gedeckt. Es bleiben ${formatEuro(getErsparnis() - drueber)} zurückgelegt.`);
+                    return;
+                }
                 setStatus('warn', 'Über dem Tagessatz',
-                    `${formatEuro(spent - limit)} über dem Tagessatz. Bis zum Geld bleiben dann ${formatEuro(tagessatzDanach)} pro Tag.`);
+                    `${formatEuro(drueber)} über dem Tagessatz. Bis zum Geld bleiben dann ${formatEuro(tagessatzDanach)} pro Tag.`);
                 return;
             }
             if (flug.status === 'knapp') {
