@@ -1224,13 +1224,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         </div>
     </div>
 
-    <!-- Modal: Einstellungen -->
-    <div id="settingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
-        <div class="modal-content">
-            <h3 class="modal-header" id="settingsModalTitle">Einstellungen</h3>
-            <div id="settingsSheetContent" class="space-y-1"></div>
-        </div>
-    </div>
 
     <!-- Modal: Kassensturz -->
     <div id="cashCountModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="cashCountModalTitle">
@@ -1866,7 +1859,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 populateMonthSelect();
                 renderCategoryChips();
                 renderUI();
-                closeModal('settingsModal');
                 showToast('Aktion rückgängig gemacht.');
             } catch (e) {
                 console.error('Undo-Fehler:', e);
@@ -1905,7 +1897,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 populateMonthSelect();
                 renderCategoryChips();
                 renderUI();
-                closeModal('settingsModal');
                 showToast('Alle Daten wurden zurückgesetzt.');
             }
         }
@@ -1953,7 +1944,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
         function exportBackupAndClose() {
             exportBackup();
-            closeModal('settingsModal');
         }
 
         function downloadBackupFile(blob, fileName) {
@@ -2259,7 +2249,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                         + (validation.skipped > 0 ? `, ${validation.skipped} übersprungen` : '')
                         + (dupes > 0 ? `, ${dupes} ${dupes === 1 ? 'Duplikat' : 'Duplikate'}` : '');
                     showToast(msg);
-                    closeModal('settingsModal');
                 } catch (err) {
                     showToast('Fehler beim Lesen der Datei: ' + err.message);
                 }
@@ -2336,7 +2325,10 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.remove('modal--open');
+            // Null-sicher: ein nicht (mehr) vorhandenes Modal darf keinen
+            // Absturz ausloesen, der die ganze Oberflaeche lahmlegt.
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('modal--open');
             if (window._lastFocusedElement) {
                 window._lastFocusedElement.focus();
             }
@@ -2352,7 +2344,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                         return;
                     }
                     // Close any open modal
-                    ['incomeModal', 'settingsModal', 'budgetModal', 'monthReportModal', 'paydayModal', 'cashCountModal'].forEach(id => {
+                    ['incomeModal', 'budgetModal', 'monthReportModal', 'paydayModal', 'cashCountModal'].forEach(id => {
                         const modal = document.getElementById(id);
                         if (modal && modal.classList.contains('modal--open')) {
                             closeModal(id);
@@ -3064,17 +3056,10 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // Der Bereich "Mehr" traegt dieselben Eintraege wie das alte
             // Menue. Erst beim Betreten fuellen, damit Stand und Anzeige
             // nicht auseinanderlaufen.
-            if (name === 'Mehr') fuelleMehr();
+            if (name === 'Mehr') renderSettingsSheet();
             window.scrollTo({ top: 0, behavior: 'auto' });
         }
 
-        function fuelleMehr() {
-            const ziel = document.getElementById('mehrInhalt');
-            const quelle = document.getElementById('settingsSheetContent');
-            if (!ziel || !quelle) return;
-            renderSettingsSheet();
-            ziel.innerHTML = quelle.innerHTML;
-        }
 
         // --- Buchungs-Sheet ---
         let betragRoh = '';
@@ -4126,9 +4111,12 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         }
 
         // B1: Settings Sheet
+        // Die Einstellungen gab es doppelt: als Modal hinter dem Menueknopf
+        // und als Tab "Mehr", der sich das HTML aus dem Modal herauskopierte.
+        // Zwei Oberflaechen fuer denselben Inhalt, eine davon per innerHTML
+        // geklont. Jetzt gibt es nur noch den Tab; der Knopf fuehrt dorthin.
         function openSettingsSheet() {
-            renderSettingsSheet();
-            openModal('settingsModal');
+            zeigeSchirm('Mehr');
         }
 
         function openPaydayModal() {
@@ -4361,7 +4349,8 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         }
 
         function renderSettingsSheet() {
-            const content = document.getElementById('settingsSheetContent');
+            const content = document.getElementById('mehrInhalt');
+            if (!content) return;
             let html = '';
 
             // Kassensturz ganz oben – der Wartungsvorgang, ohne den der abgeleitete
@@ -4372,7 +4361,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 : (tageSeitZaehlung === 0 ? 'heute gezählt'
                     : (tageSeitZaehlung === 1 ? 'vor 1 Tag' : `vor ${tageSeitZaehlung} Tagen`));
             html += `
-                <button class="settings-sheet-item" onclick="openCashCountModal(); closeModal('settingsModal');">
+                <button class="settings-sheet-item" onclick="openCashCountModal();">
                     Bargeld nachzählen
                     <span class="block text-[11px] text-slate-400 font-normal">${escapeHtml(zaehlHinweis)}</span>
                 </button>
@@ -4387,14 +4376,14 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
             // Month Report
             html += `
-                <button class="settings-sheet-item" onclick="openMonthReport(); closeModal('settingsModal');">
+                <button class="settings-sheet-item" onclick="openMonthReport();">
                     Monatsabschluss
                 </button>
             `;
 
             // Standard options
             html += `
-                <button class="settings-sheet-item" onclick="exportBackup(); closeModal('settingsModal');">
+                <button class="settings-sheet-item" onclick="exportBackup();">
                     Backup exportieren
                 </button>
             `;
@@ -4431,7 +4420,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // eine installierte App bekommt ein eigenes Fenster.
             if (canInstallApp()) {
                 html += `
-                    <button class="settings-sheet-item" onclick="triggerInstallPrompt(); closeModal('settingsModal');">
+                    <button class="settings-sheet-item" onclick="triggerInstallPrompt();">
                         Als App installieren
                     </button>
                 `;
