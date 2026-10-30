@@ -585,6 +585,39 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .category-toggle { width: 100%; text-align: left; }
 .category-items { margin-top: 0.5rem; }
 
+/* Geplante Ausgaben. Vorher trug die Zeile vier Hilfsklassen, von denen
+   KEINE im Stylesheet stand (line-through, opacity-50, bg-slate-700/40,
+   bg-emerald-500/20): eine erledigte Reservierung sah aus wie eine offene,
+   nur das Zeichen im Knopf war anders. Als Bauteil kann das nicht
+   auseinanderfallen. */
+.res {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    background-color: rgba(13, 21, 36, 0.6);
+    border-radius: var(--radius-s);
+    padding: 0.625rem 0.75rem;
+}
+.res__name { font-size: 0.8125rem; font-weight: 500; color: var(--text-2); }
+.res__betrag { font-size: 0.875rem; font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.res__haken {
+    min-width: 2.75rem; min-height: 2.75rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-s);
+    background-color: var(--flaeche-hoch);
+    color: var(--text-3);
+    flex: none;
+    transition: background-color 0.15s, color 0.15s;
+}
+.res__haken:hover { background-color: var(--linie); }
+
+.res--erledigt { background-color: rgba(43, 56, 82, 0.4); }
+.res--erledigt .res__name,
+.res--erledigt .res__betrag { text-decoration: line-through; opacity: 0.5; }
+.res--erledigt .res__haken { background-color: rgba(52, 211, 153, 0.2); color: var(--gruen); }
+.res--erledigt .res__haken:hover { background-color: rgba(52, 211, 153, 0.3); }
+
 /* ========================================================================
    8. Modale und Buchungs-Sheet
    ===================================================================== */
@@ -753,36 +786,21 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .shrink-0 { flex-shrink: 0; }
 .min-w-0 { min-width: 0; }
 .items-center { align-items: center; }
-.items-start { align-items: flex-start; }
 .items-baseline { align-items: baseline; }
 .justify-between { justify-content: space-between; }
 .justify-center { justify-content: center; }
-.relative { position: relative; }
-.fixed { position: fixed; }
-.sticky { position: sticky; }
-.top-0 { top: 0; }
-.bottom-4 { bottom: 1rem; }
-.left-1\/2 { left: 50%; }
 .-translate-x-1\/2 { transform: translateX(-50%); }
-.z-30 { z-index: 30; }
-.z-\[60\] { z-index: 60; }
 .overflow-hidden { overflow: hidden; }
-.overflow-y-auto { overflow-y: auto; }
-.max-h-96 { max-height: 24rem; }
-.max-w-md { max-width: 28rem; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .w-full { width: 100%; }
 .w-1\/2 { width: 50%; }
-.w-2 { width: 0.5rem; }
 .w-3\.5 { width: 0.875rem; }
 .w-12 { width: 3rem; }
 .h-2 { height: 0.5rem; }
-.h-3 { height: 0.75rem; }
 .h-3\.5 { height: 0.875rem; }
 .h-1\.5 { height: 0.375rem; }
 .h-12 { height: 3rem; }
 .h-full { height: 100%; }
-.min-h-11 { min-height: 2.75rem; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .text-left { text-align: left; }
 .text-center { text-align: center; }
@@ -790,23 +808,16 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .uppercase { text-transform: uppercase; }
 .leading-none { line-height: 1; }
 .leading-relaxed { line-height: 1.625; }
-.pointer-events-none { pointer-events: none; }
-.backdrop-blur { backdrop-filter: blur(12px); }
 
 .gap-1\.5 { gap: 0.375rem; }
 .gap-2 { gap: 0.5rem; }
 .gap-2\.5 { gap: 0.625rem; }
 .gap-3 { gap: 0.75rem; }
 
-.p-0\.5 { padding: 0.125rem; }
-.p-4 { padding: 1rem; }
 .p-5 { padding: 1.25rem; }
 .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
 .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-.px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
 .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
-.px-4 { padding-left: 1rem; padding-right: 1rem; }
-.py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
 .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
 .py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
 .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
@@ -818,21 +829,17 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .pt-2 { padding-top: 0.5rem; }
 .pt-3 { padding-top: 0.75rem; }
 .pb-4 { padding-bottom: 1rem; }
-.pr-1 { padding-right: 0.25rem; }
 .mb-1 { margin-bottom: 0.25rem; }
-.mb-2 { margin-bottom: 0.5rem; }
 .mb-3 { margin-bottom: 0.75rem; }
 .mb-4 { margin-bottom: 1rem; }
 .mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
-.mt-3 { margin-top: 0.75rem; }
 
 .space-y-1 > * + * { margin-top: 0.25rem; }
 .space-y-1\.5 > * + * { margin-top: 0.375rem; }
 .space-y-2 > * + * { margin-top: 0.5rem; }
 .space-y-3 > * + * { margin-top: 0.75rem; }
 .space-y-4 > * + * { margin-top: 1rem; }
-.space-x-2 > * + * { margin-left: 0.5rem; }
 
 .text-\[11px\] { font-size: 0.6875rem; }
 .text-xs { font-size: 0.8125rem; }
@@ -841,17 +848,11 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .text-lg { font-size: 1.125rem; }
 .text-xl { font-size: 1.25rem; }
 .text-2xl { font-size: 1.5rem; }
-.text-5xl { font-size: 3rem; }
 .font-normal { font-weight: 400; }
 .font-medium { font-weight: 500; }
 .font-semibold { font-weight: 600; }
 .font-bold { font-weight: 700; }
-.font-extrabold { font-weight: 800; }
-.tracking-tight { letter-spacing: -0.015em; }
-.tracking-tighter { letter-spacing: -0.03em; }
-.tracking-wide { letter-spacing: 0.01em; }
 .tracking-wider { letter-spacing: 0.05em; }
-.tracking-widest { letter-spacing: 0.12em; }
 
 .text-white { color: #fff; }
 .text-slate-100 { color: var(--text); }
@@ -864,21 +865,13 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .text-red-300, .text-red-400 { color: var(--rot); }
 .text-amber-300, .text-amber-400 { color: var(--gelb); }
 
-.bg-transparent { background-color: transparent; }
-.bg-slate-500 { background-color: var(--text-4); }
-.bg-slate-600 { background-color: var(--linie); }
 .bg-slate-700 { background-color: var(--flaeche-hoch); }
-.bg-slate-700\/50, .bg-slate-700\/60 { background-color: rgba(43, 56, 82, 0.6); }
 .bg-slate-800 { background-color: var(--flaeche); }
-.bg-slate-800\/50 { background-color: rgba(22, 31, 48, 0.55); }
 .bg-slate-900 { background-color: var(--flaeche-tief); }
 .bg-slate-900\/40 { background-color: rgba(13, 21, 36, 0.4); }
 .bg-slate-900\/60 { background-color: rgba(13, 21, 36, 0.6); }
-.bg-slate-900\/80 { background-color: rgba(13, 21, 36, 0.8); }
 .bg-slate-950\/50 { background-color: rgba(2, 6, 23, 0.5); }
 .bg-emerald-500 { background-color: var(--gruen); }
-.bg-emerald-500\/10 { background-color: rgba(52, 211, 153, 0.1); }
-.bg-emerald-600 { background-color: var(--gruen-knopf); }
 .bg-red-500 { background-color: var(--rot-kraeftig); }
 .bg-red-500\/10 { background-color: rgba(239, 68, 68, 0.1); }
 .bg-red-950\/50 { background-color: rgba(69, 10, 10, 0.5); }
@@ -887,15 +880,11 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .border { border: 1px solid var(--linie); }
 .border-b { border-bottom: 1px solid var(--linie); }
 .border-t { border-top: 1px solid var(--linie); }
-.border-slate-600 { border-color: var(--linie); }
-.border-slate-700, .border-slate-700\/50, .border-slate-700\/60 { border-color: var(--linie); }
-.border-slate-800 { border-color: var(--linie-zart); }
-.border-emerald-500\/20 { border-color: rgba(52, 211, 153, 0.25); }
+.border-slate-700, .border-slate-700\/50 { border-color: var(--linie); }
 .border-red-500\/30 { border-color: rgba(239, 68, 68, 0.3); }
 .border-red-500\/70 { border-color: rgba(239, 68, 68, 0.7); }
 .border-amber-500\/30 { border-color: rgba(245, 158, 11, 0.3); }
 
-.rounded { border-radius: 0.25rem; }
 .rounded-md { border-radius: 0.375rem; }
 .rounded-lg { border-radius: 0.5rem; }
 .rounded-xl { border-radius: 0.75rem; }
@@ -904,16 +893,11 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
 .shadow-sm { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
 .shadow-lg { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
-.shadow-xl { box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35); }
-.shadow-2xl { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5); }
 .ring-2 { box-shadow: 0 0 0 2px currentColor; }
 .ring-red-500\/25 { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25); }
 
 .transition-all, .transition-all-200 { transition: all 0.2s; }
 .transition-colors { transition: color 0.2s, background-color 0.2s; }
-.transition-opacity { transition: opacity 0.3s; }
-.duration-300 { transition-duration: 0.3s; }
-.duration-500 { transition-duration: 0.5s; }
 .opacity-0 { opacity: 0; }
 .opacity-100 { opacity: 1; }
 .animate-pulse { animation: pulsieren 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
@@ -1342,12 +1326,18 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         let transactionFilter = 'all';
         let transactionDisplayCount = 30;
 
+        // Farbe als Wert, nicht als Klassenname. Vorher stand hier
+        // color: 'bg-sky-400' – eine Klasse, die im Stylesheet existieren
+        // musste. Beim Ausbau von Tailwind sind genau diese fuenf
+        // untergegangen, weil sie nirgends im Markup stehen: vier von fuenf
+        // Kategoriebalken waren monatelang unsichtbar, ohne Fehlermeldung.
+        // Als Wert kann die Verbindung nicht mehr ins Leere zeigen.
         const CATEGORIES = [
-            { id: 'Haushalt/Essen', label: 'Essen / Haushalt', icon: '🛒', color: 'bg-sky-400' },
-            { id: 'Tabak', label: 'Tabak', icon: '🚬', color: 'bg-violet-400' },
-            { id: 'Reptilien', label: 'Reptilien', icon: '🦎', color: 'bg-teal-400' },
-            { id: 'Privatkäufe', label: 'Privatkäufe', icon: '🛍️', color: 'bg-fuchsia-400' },
-            { id: 'Sonstiges', label: 'Sonstiges', icon: '📦', color: 'bg-slate-400' }
+            { id: 'Haushalt/Essen', label: 'Essen / Haushalt', icon: '🛒', farbe: '#38bdf8' },
+            { id: 'Tabak', label: 'Tabak', icon: '🚬', farbe: '#a78bfa' },
+            { id: 'Reptilien', label: 'Reptilien', icon: '🦎', farbe: '#2dd4bf' },
+            { id: 'Privatkäufe', label: 'Privatkäufe', icon: '🛍️', farbe: '#e879f9' },
+            { id: 'Sonstiges', label: 'Sonstiges', icon: '📦', farbe: '#94a3b8' }
         ];
 
         // ---------- A1: Local Date Helpers ----------
@@ -1411,6 +1401,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             setupModalKeyboard();
             ueberwacheTageswechsel();
             beobachteAndereFenster();
+            beobachteNeueFassung();
             registerServiceWorker();
         });
 
@@ -1469,6 +1460,59 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             );
         }
 
+        /* ================================================================
+           Neue Fassung uebernehmen
+           ----------------------------------------------------------------
+           Hier stand eine Meldung "App neu starten" und daneben ein
+           applyUpdate(), das von nirgendwo aufgerufen wurde - es gab keinen
+           Knopf dafuer. Die Aufforderung lief also ins Leere, und der
+           Nutzer musste von sich aus schliessen und neu oeffnen.
+
+           Noetig ist das gar nicht: der Service Worker uebernimmt per
+           skipWaiting von selbst. Fehlt nur das Neuladen der offenen Seite.
+           Das macht die App jetzt selbst - aber nur, wenn gerade nichts
+           offen ist. Mitten in einer Buchung neu zu laden waere schlimmer
+           als die alte Fassung noch einen Moment anzuzeigen.
+           ================================================================ */
+        let neueFassungBereit = false;
+
+        function promptUserForUpdate() {
+            neueFassungBereit = true;
+            vielleichtNeuLaden();
+        }
+
+        function etwasOffen() {
+            const sheet = document.getElementById('buchenSheet');
+            if (sheet && sheet.classList.contains('sheet--offen')) return true;
+            if (document.querySelector('.modal.modal--open')) return true;
+            // Auch ein angefangener Betrag zaehlt als offene Arbeit.
+            if (typeof betragRoh === 'string' && betragRoh !== '') return true;
+            return false;
+        }
+
+        function vielleichtNeuLaden() {
+            if (!neueFassungBereit) return;
+            if (etwasOffen()) {
+                showToast('Neue Version bereit – wird gleich geladen.');
+                return;
+            }
+            neueFassungBereit = false;
+            window.location.reload();
+        }
+
+        function beobachteNeueFassung() {
+            if (!('serviceWorker' in navigator)) return;
+            // Uebernimmt ein neuer Service Worker, ist die Seite veraltet.
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                neueFassungBereit = true;
+                vielleichtNeuLaden();
+            });
+            // Zweiter Anlauf, sobald die App wieder in den Vordergrund kommt.
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) vielleichtNeuLaden();
+            });
+        }
+
         function triggerInstallPrompt() {
           if (!deferredInstallPrompt) {
             showToast('App-Installation wird nicht unterstützt.');
@@ -1509,19 +1553,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             }
         }
 
-        function promptUserForUpdate(worker) {
-            showToast('Neue Version verfügbar – App neu starten.');
-            window._waitingWorker = worker;
-        }
 
-        function applyUpdate() {
-            if (window._waitingWorker) {
-                window._waitingWorker.postMessage('SKIP_WAITING');
-                navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    window.location.reload();
-                });
-            }
-        }
 
         // ---------- Storage ----------
         /* ================================================================
@@ -2353,12 +2385,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
         }
 
-        function getDaysRemainingInMonth() {
-            const now = new Date();
-            const totalDays = getDaysInCurrentMonth();
-            const currentDay = now.getDate();
-            return (totalDays - currentDay) + 1;
-        }
 
         // ---------- Horizon Functions ----------
         function getHorizonDate() {
@@ -3344,20 +3370,19 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 const categoryIcon = cat ? cat.icon : '';
                 const categoryLabel = cat ? cat.label : (res.category || '');
                 const categoryDisplay = res.category ? ` · ${categoryIcon} ${escapeHtml(categoryLabel)}` : '';
-                const doneClass = res.done ? 'line-through opacity-50' : '';
-                const doneStateClass = res.done ? 'bg-slate-700/40' : 'bg-slate-900/60';
+                const erledigt = res.done ? ' res--erledigt' : '';
 
                 return `
-                    <div class="flex items-center justify-between ${doneStateClass} rounded-lg px-3 py-2.5">
+                    <div class="res${erledigt}">
                         <div class="flex-1 min-w-0">
-                            <div class="text-xs font-medium text-slate-200 ${doneClass}">${escapeHtml(res.label)}${categoryDisplay}</div>
-                            <div class="text-sm font-semibold text-slate-400 ${doneClass}">${formatEuro(res.amount)}</div>
+                            <div class="res__name">${escapeHtml(res.label)}${categoryDisplay}</div>
+                            <div class="res__betrag">${formatEuro(res.amount)}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
-                            <button class="reservationDoneBtn text-xs px-2 py-1.5 rounded-md transition-all ${res.done ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}" title="${res.done ? 'Rückgängig' : 'Erledigt'}" data-id="${escapeAttr(res.id)}" aria-label="${res.done ? 'Als offen markieren' : 'Als erledigt markieren'}">
+                            <button class="reservationDoneBtn res__haken" title="${res.done ? 'Rückgängig' : 'Erledigt'}" data-id="${escapeAttr(res.id)}" aria-label="${res.done ? 'Als offen markieren' : 'Als erledigt markieren'}">
                                 <span aria-hidden="true">${res.done ? '✓' : '○'}</span>
                             </button>
-                            <button class="reservationDeleteBtn text-xs px-2 py-1.5 text-slate-400 hover:text-red-400 rounded-md transition-all hover:bg-red-500/10" title="Löschen" data-id="${escapeAttr(res.id)}" aria-label="Geplante Ausgabe löschen">
+                            <button class="reservationDeleteBtn" title="Löschen" data-id="${escapeAttr(res.id)}" aria-label="Geplante Ausgabe löschen">
                                 <span aria-hidden="true">✕</span>
                             </button>
                         </div>
@@ -3955,7 +3980,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 const budget = appState.budgets?.[cat.id] || 0;
 
                 let pct = 0;
-                let barColor = cat.color;
+                let balkenFarbe = cat.farbe;
                 let displayText = '';
 
                 if (budget > 0) {
@@ -3963,7 +3988,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                     pct = Math.min(100, Math.round((spent / budget) * 100));
                     displayText = `${formatEuro(spent)} / ${formatEuro(budget)}`;
                     if (spent > budget) {
-                        barColor = 'bg-red-500';
+                        balkenFarbe = 'var(--rot-kraeftig)';
                     }
                 } else {
                     // Ohne Budget: anteilig
@@ -3982,7 +4007,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                             <span class="text-slate-400 font-semibold">${displayText}</span>
                         </div>
                         <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
-                            <div class="${barColor} h-full rounded-full" style="width: ${pct}%"></div>
+                            <div class="h-full rounded-full" style="width: ${pct}%; background-color: ${balkenFarbe}"></div>
                         </div>
                         ${overBudgetHint}
                     </div>
@@ -4446,9 +4471,8 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 const displayValue = currentBudget > 0 ? currentBudget : '';
                 return `
                     <div>
-                        <label for="budget-${escapeAttr(cat.id)}" class="block text-xs font-medium text-slate-400 mb-1">${cat.label}</label>
-                        <input type="number" id="budget-${escapeAttr(cat.id)}" inputmode="decimal" step="0.01" min="0" placeholder="Kein Limit" value="${displayValue}"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-semibold text-base focus:border-emerald-500">
+                        <label for="budget-${escapeAttr(cat.id)}" class="block-d text-xs font-medium text-slate-400 mb-1">${cat.label}</label>
+                        <input type="number" id="budget-${escapeAttr(cat.id)}" inputmode="decimal" step="0.01" min="0" placeholder="Kein Limit" value="${displayValue}">
                     </div>
                 `;
             }).join('');
@@ -4473,39 +4497,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         }
 
         // ---------- A11: Category Budgets (Logik) ----------
-        function setBudget(catId, value) {
-            if (!appState.budgets) appState.budgets = {};
-            appState.budgets[catId] = parseFloat(value) || 0;
-            saveToStorage();
-            renderUI();
-        }
 
-        function getBudgetUsage(catId, monthKey) {
-            const categoryExpenses = appState.transactions
-                .filter(tx => tx.type === 'expense' && tx.category === catId && txLocalMonthKey(tx) === monthKey)
-                .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-
-            const budget = appState.budgets?.[catId] || 0;
-            const isBudgetSet = budget > 0;
-
-            let spent = categoryExpenses;
-            let budgetAmount = budget;
-            let pct = 0;
-            let over = false;
-
-            if (isBudgetSet) {
-                pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
-                over = spent > budget;
-            } else {
-                const monthTotal = appState.transactions
-                    .filter(tx => tx.type === 'expense' && txLocalMonthKey(tx) === monthKey)
-                    .reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
-                pct = monthTotal > 0 ? Math.round((spent / monthTotal) * 100) : 0;
-                budgetAmount = monthTotal;
-            }
-
-            return { spent, budget: budgetAmount, pct, over };
-        }
 
         function escapeHtml(str) {
             const div = document.createElement('div');
