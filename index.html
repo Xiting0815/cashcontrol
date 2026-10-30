@@ -618,30 +618,59 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 .res--erledigt .res__haken { background-color: rgba(52, 211, 153, 0.2); color: var(--gruen); }
 .res--erledigt .res__haken:hover { background-color: rgba(52, 211, 153, 0.3); }
 
-/* Ersparnis. Der einzige Posten, der waechst, wenn man nichts tut -
-   deshalb bekommt er den gruenen Akzent, den sonst nichts mehr traegt. */
-.ersparnis {
+/* Eckdaten: Zahlen nebeneinander statt Saetze untereinander. Die alte
+   Startseite erklaerte dieselben Werte in Fliesstext – dreimal den
+   Tagessatz, dreimal die Ersparnis, dreimal die Reichweite. */
+.eckdaten {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    gap: 1.25rem;
+    margin: 0.875rem 0 0;
+    padding-top: 0.875rem;
     border-top: 1px solid var(--linie-zart);
 }
-.ersparnis__marke {
+.eckdaten > div { min-width: 0; }
+.eckdaten > div.hidden { display: none; }
+.eckdaten dt {
     font-size: 0.6875rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: var(--gruen);
+    color: var(--text-4);
+    margin-bottom: 0.125rem;
 }
-.ersparnis__wert {
-    font-size: 1.125rem;
+.eckdaten dd {
+    margin: 0;
+    font-size: 1rem;
     font-weight: 700;
-    color: var(--gruen);
+    color: var(--text);
     font-variant-numeric: tabular-nums;
 }
+.eckdaten__gruen { color: var(--gruen); }
+
+/* Der Rechenweg steht eingeklappt: er wird nur gebraucht, wenn jemand
+   die Zahl nachrechnet, und soll sonst nicht im Weg stehen. */
+.rechenweg { margin-top: 0.75rem; }
+.rechenweg summary {
+    font-size: 0.8125rem;
+    color: var(--text-4);
+    cursor: pointer;
+    list-style: none;
+    padding: 0.375rem 0;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.rechenweg summary::-webkit-details-marker { display: none; }
+.rechenweg summary::before {
+    content: "›";
+    display: inline-block;
+    transition: transform 0.15s;
+    font-size: 1rem;
+}
+.rechenweg[open] summary::before { transform: rotate(90deg); }
+.rechenweg .tempo__grundlage { margin-top: 0; }
+
 
 /* ========================================================================
    8. Modale und Buchungs-Sheet
@@ -977,6 +1006,10 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 </div>
             </div>
 
+            <!-- Heute traegt nur noch, was eine Entscheidung JETZT beeinflusst.
+                 Alles Periodenweite ist in den Monat gewandert: der Bildschirm
+                 nannte den Tagessatz dreimal, die Ersparnis dreimal und sagte
+                 in drei Saetzen dasselbe ueber die Reichweite. -->
             <section id="statusCard" class="karte" aria-live="polite">
                 <div class="karte__kopf" style="margin-bottom:1rem;">
                     <span class="marke" id="todayRemainingLabel">Verbleibend heute</span>
@@ -985,7 +1018,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
                 <div class="held__zahl" id="todayRemainingDisplay">0,00 €</div>
 
-                <!-- Zwei Spuren: Geld gegen Zeit. Der Reiter ist die Zeitmarke. -->
                 <div class="spur">
                     <div class="spur__kopf">
                         <span>Heute ausgegeben <b id="todaySpentDisplay">0,00 €</b></span>
@@ -996,9 +1028,41 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                     </div>
                 </div>
 
-                <div class="spur">
+                <!-- Nur sichtbar, wenn es etwas zu sagen gibt. Im Normalfall
+                     stand hier ein Satz, der die grosse Zahl darueber
+                     wiederholte. -->
+                <p id="statusMessage" class="hidden">Du bist heute gut im Rahmen.</p>
+            </section>
+
+            <section class="karte karte--still">
+                <div class="karte__kopf" style="margin-bottom:0.5rem;">
+                    <span class="marke">Bargeldbestand</span>
+                    <button class="knopf knopf--still knopf--klein" onclick="openModal('incomeModal')">+ Geld erhalten</button>
+                </div>
+                <div class="text-xl font-bold tabular-nums" id="totalCashDisplay">0,00 €</div>
+
+                <dl class="eckdaten">
+                    <div>
+                        <dt>Bis zum Geld</dt>
+                        <dd><span id="daysUntilMoneyDisplay">--</span> Tage</dd>
+                    </div>
+                    <div id="ersparnisZeile" class="hidden">
+                        <dt>Erspart</dt>
+                        <dd class="eckdaten__gruen" id="ersparnisWert">0,00 €</dd>
+                    </div>
+                </dl>
+            </section>
+        </section>
+
+        <!-- ============================ MONAT ============================ -->
+        <section class="bildschirm" id="schirmMonat" role="tabpanel" aria-labelledby="tabMonat">
+
+            <!-- Der Periodenblick: alles, was nicht die Entscheidung von
+                 heute betrifft, sondern den Stand im Monat. -->
+            <section class="karte">
+                <div class="spur" style="margin-top:0;">
                     <div class="spur__kopf">
-                        <span>Periode: Geld verbraucht</span>
+                        <span>Geld verbraucht</span>
                         <span><b id="periodeProzent">0 %</b></span>
                     </div>
                     <div class="spur__gleis">
@@ -1026,13 +1090,14 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
                 <p class="tempo__folge" id="tempoFolge"></p>
 
-                <!-- Die Rechnung offenlegen. Wer 430 € durch 14 Tage teilt, kommt
-                     auf 30,71 € und haelt die App fuer kaputt. Der Tagessatz geht
-                     vom Stand heute frueh aus – sonst schrumpfte er bei jeder
-                     Buchung. Diese Zeile macht das nachrechenbar. -->
-                <p class="tempo__grundlage" id="tempoGrundlage"></p>
+                <!-- Die Rechnung hinter dem Tagessatz. Steht eingeklappt, weil
+                     sie nur dann gebraucht wird, wenn jemand nachrechnet. -->
+                <details class="rechenweg">
+                    <summary>Wie kommt der Tagessatz zustande?</summary>
+                    <p class="tempo__grundlage" id="tempoGrundlage"></p>
+                </details>
 
-                <p id="statusMessage">Du bist heute gut im Rahmen.</p>
+                <div id="runwayDisplay" class="mt-3">Noch keine Ausgaben erfasst</div>
             </section>
 
             <div id="lobBand" class="lobband hidden" role="status">
@@ -1044,43 +1109,6 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 <span class="muster__marke">Muster</span>
                 <ul class="muster__liste" id="musterListe"></ul>
             </section>
-
-            <!-- Bestand tritt bewusst zurück: Kontext, nicht Entscheidungszahl. -->
-            <section class="karte karte--still">
-                <div class="karte__kopf" style="margin-bottom:0.5rem;">
-                    <span class="marke">Bargeldbestand</span>
-                    <button class="knopf knopf--still knopf--klein" onclick="openModal('incomeModal')">+ Geld erhalten</button>
-                </div>
-                <div class="text-xl font-bold tabular-nums" id="totalCashDisplay">0,00 €</div>
-
-                <div class="pt-3 space-y-1.5" style="border-top:1px solid var(--linie-zart);margin-top:0.75rem;">
-                    <div class="text-xs text-slate-400">Bis zum Geld: <strong class="text-slate-200" id="daysUntilMoneyDisplay">--</strong> Tage</div>
-                    <div id="runwayDisplay">Noch keine Ausgaben erfasst</div>
-                </div>
-
-                <div id="reservationInfo" class="pt-3 space-y-1.5 hidden">
-                    <div class="flex justify-between text-xs text-slate-400">
-                        <span>davon eingeplant:</span>
-                        <span class="text-slate-200 font-semibold tabular-nums" id="reservedAmountDisplay">0,00 €</span>
-                    </div>
-                    <div class="flex justify-between text-xs text-slate-400">
-                        <span>frei verfügbar:</span>
-                        <span class="font-semibold tabular-nums" id="availableAfterReservationsDisplay">0,00 €</span>
-                    </div>
-                </div>
-
-                <!-- Ersparnis als eigener Posten. Sie wird nicht auf die
-                     Resttage verteilt, also gehoert sie auch nicht in den
-                     Tagessatz, sondern sichtbar daneben. -->
-                <div id="ersparnisZeile" class="ersparnis hidden">
-                    <span class="ersparnis__marke">Erspart diese Periode</span>
-                    <span class="ersparnis__wert" id="ersparnisWert">0,00 €</span>
-                </div>
-            </section>
-        </section>
-
-        <!-- ============================ MONAT ============================ -->
-        <section class="bildschirm" id="schirmMonat" role="tabpanel" aria-labelledby="tabMonat">
 
             <section class="karte">
                 <div class="karte__kopf">
@@ -1118,6 +1146,18 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 <div id="reservationsList" class="space-y-2">
                     <p class="text-xs text-slate-400 text-center py-3">Nichts eingeplant. Trage hier ein, was diesen Monat noch ansteht — es senkt dein Tagesbudget sofort.</p>
                 </div>
+
+                <!-- Gehoert zu den geplanten Ausgaben, nicht auf die Startseite. -->
+                <dl id="reservationInfo" class="eckdaten hidden">
+                    <div>
+                        <dt>Eingeplant</dt>
+                        <dd id="reservedAmountDisplay">0,00 €</dd>
+                    </div>
+                    <div>
+                        <dt>Frei verfügbar</dt>
+                        <dd id="availableAfterReservationsDisplay">0,00 €</dd>
+                    </div>
+                </dl>
             </section>
         </section>
 
@@ -3757,13 +3797,20 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         function renderTempoGrundlage(dailyLimit) {
             const el = document.getElementById('tempoGrundlage');
             if (!el) return;
+            // Den ganzen Ausklapper verbergen, wenn nichts drinsteht - ein
+            // leeres "Wie kommt der Tagessatz zustande?" waere eine Falle.
+            const huelle = el.closest('.rechenweg');
+            const zeigen = (text) => {
+                el.innerText = text;
+                if (huelle) huelle.classList.toggle('hidden', !text);
+            };
 
             const tage = getDaysUntilHorizon();
             const bestand = appState.totalCash;
             const eingeplant = getReservedRemaining();
             const restHeute = dailyLimit - getTodaySpent();
 
-            if (!(bestand > 0) || tage < 1) { el.innerText = ''; return; }
+            if (!(bestand > 0) || tage < 1) { zeigen(''); return; }
 
             // Greift die Deckelung, stimmt die alte Rechnung nicht mehr:
             // Bestand minus Tagesrest geteilt durch die Resttage ergaebe den
@@ -3771,13 +3818,13 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // sonst ist die Zeile wieder das, was sie heilen sollte.
             const ersparnis = getErsparnis();
             if (ersparnis > 0.005) {
-                el.innerText = `Grundlage: ${formatEuro(dailyLimit)} pro Tag – so viel war für die ganze Periode geplant. `
-                    + `Deine Ersparnis von ${formatEuro(ersparnis)} bleibt außen vor und wird nicht mitverteilt.`;
+                zeigen(`Grundlage: ${formatEuro(dailyLimit)} pro Tag – so viel war für die ganze Periode geplant. `
+                    + `Deine Ersparnis von ${formatEuro(ersparnis)} bleibt außen vor und wird nicht mitverteilt.`);
                 return;
             }
 
             if (tage === 1) {
-                el.innerText = `Grundlage: ${formatEuro(bestand)} für heute – morgen kommt Geld.`;
+                zeigen(`Grundlage: ${formatEuro(bestand)} für heute – morgen kommt Geld.`);
                 return;
             }
 
@@ -3788,17 +3835,17 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // zeigen, der ab morgen tatsaechlich gilt.
             if (restHeute <= 0) {
                 const abMorgen = Math.max(0, bestand - eingeplant) / spaeter;
-                el.innerText = `Grundlage: Heute ist dein Satz aufgebraucht. `
+                zeigen(`Grundlage: Heute ist dein Satz aufgebraucht. `
                     + `${formatEuro(Math.max(0, bestand - eingeplant))} auf die ${spaeter} Tage ab morgen `
-                    + `sind ${formatEuro(abMorgen)} pro Tag.`;
+                    + `sind ${formatEuro(abMorgen)} pro Tag.`);
                 return;
             }
 
             const rest = bestand - restHeute - eingeplant;
             const teile = [`${formatEuro(bestand)} Bestand`, `${formatEuro(restHeute)} für heute`];
             if (eingeplant > 0) teile.push(`${formatEuro(eingeplant)} eingeplant`);
-            el.innerText = `Grundlage: ${teile.join(' − ')} = ${formatEuro(rest)} `
-                + `auf die ${spaeter} ${spaeter === 1 ? 'Tag' : 'Tage'} danach.`;
+            zeigen(`Grundlage: ${teile.join(' − ')} = ${formatEuro(rest)} `
+                + `auf die ${spaeter} ${spaeter === 1 ? 'Tag' : 'Tage'} danach.`);
         }
 
         // ---------- Bestätigung für den Vortag ----------
@@ -4012,6 +4059,10 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 progressBar.dataset.zustand = art;
                 badge.innerText = badgeText;
                 message.innerText = text;
+                // Im Normalfall sagt die Marke oben rechts bereits alles, und
+                // der Satz wiederholte nur die grosse Zahl darunter. Er
+                // erscheint deshalb nur, wenn es wirklich etwas zu lesen gibt.
+                message.classList.toggle('hidden', art === 'ok');
             }
 
             // A1: Leerzustand – kein roter Alarm beim ersten Start
@@ -4054,7 +4105,9 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // erkennbar nicht bis zum Zahltag kommt, darf keine grüne Karte sehen.
             if (flug.status === 'kritisch') {
                 setStatus('warn', 'Geld wird knapp',
-                    `Bei deinem Schnitt von ${formatEuro(flug.schnitt)} pro Tag reicht das Bargeld noch ${flug.reichweite} Tage – bis zum Geld sind es ${flug.tage}.`);
+                    flug.reichweite <= 0
+                        ? `Bei deinem Schnitt von ${formatEuro(flug.schnitt)} pro Tag ist das Bargeld aufgebraucht – bis zum Geld sind es noch ${flug.tage} Tage.`
+                        : `Bei deinem Schnitt von ${formatEuro(flug.schnitt)} pro Tag reicht das Bargeld noch ${flug.reichweite} ${flug.reichweite === 1 ? 'Tag' : 'Tage'} – bis zum Geld sind es ${flug.tage}.`);
                 return;
             }
             if (spent > limit && limit > 0) {
