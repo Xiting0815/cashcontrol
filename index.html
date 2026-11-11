@@ -470,17 +470,19 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
     min-height: 2.75rem;
 }
 
+/* Kategorien beim Buchen. Vorher eine waagerechte Scrollleiste: von fuenf
+   festen Kategorien waren zwei sichtbar, "Privatkaeufe" und "Sonstiges"
+   nur durch Wischen erreichbar. Beim Buchen - der haeufigsten Handlung -
+   darf keine Wahlmoeglichkeit versteckt sein. Die Anzahl ist fest und
+   klein, also passen alle in zwei Reihen. */
 .chip-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
     margin-bottom: 0.75rem;
-    scrollbar-width: none;
 }
-.chip-row::-webkit-scrollbar { display: none; }
 .chip {
-    flex: none;
+    flex: 0 1 auto;
     padding: 0.5rem 0.875rem;
     border-radius: 999px;
     background-color: var(--flaeche-hoch);
@@ -649,8 +651,19 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
 /* Der Rechenweg steht eingeklappt: er wird nur gebraucht, wenn jemand
    die Zahl nachrechnet, und soll sonst nicht im Weg stehen. */
-.rechenweg { margin-top: 0.75rem; }
-.rechenweg summary {
+/* Gruppen im Bereich "Mehr". Eine flache Liste aus zehn Eintraegen zwingt
+   dazu, jedes Mal alles zu lesen; Ueberschriften lassen das Auge springen. */
+.gruppe + .gruppe { margin-top: 1.25rem; }
+.gruppe__titel {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-4);
+    margin: 0 0 0.375rem 0.75rem;
+}
+
+.rechenweg { margin-top: 0.75rem; }.rechenweg summary {
     font-size: 0.8125rem;
     color: var(--text-4);
     cursor: pointer;
@@ -1002,7 +1015,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             <div id="periodBanner" class="backup-banner hidden">
                 <span class="backup-banner-text" id="periodBannerText"></span>
                 <div class="backup-banner-actions">
-                    <button class="knopf knopf--haupt knopf--klein" onclick="openModal('incomeModal')">Geld eintragen</button>
+                    <button class="knopf knopf--haupt knopf--klein" onclick="openModal('incomeModal')">+ Geld erhalten</button>
                 </div>
             </div>
 
@@ -2138,8 +2151,11 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             }
 
             const monatsName = new Date().toLocaleDateString('de-DE', { month: 'long' });
-            text.innerText = `Für ${monatsName} ist noch kein Geld eingetragen. `
-                + `Das Tagesbudget rechnet gerade nur mit dem Rest aus dem Vormonat.`;
+            // Mit leerer Kasse gibt es keinen "Rest aus dem Vormonat", von dem
+            // die App rechnen koennte - der Satz war dort schlicht falsch.
+            text.innerText = appState.totalCash > 0.005
+                ? `Für ${monatsName} ist noch kein Geld eingetragen. Das Tagesbudget rechnet gerade nur mit dem Rest aus dem Vormonat.`
+                : `Für ${monatsName} ist noch kein Geld eingetragen. Trage ein, was du bekommen hast – vorher kann die App kein Tagesbudget berechnen.`;
             banner.classList.remove('hidden');
         }
 
@@ -2430,21 +2446,34 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         // B6: Modal Keyboard Support
         function setupModalKeyboard() {
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    const warningModal = document.getElementById('warningModal');
-                    if (warningModal && warningModal.classList.contains('modal--open')) {
-                        cancelPendingExpense();
-                        return;
-                    }
-                    // Close any open modal
-                    ['incomeModal', 'budgetModal', 'monthReportModal', 'paydayModal', 'cashCountModal'].forEach(id => {
-                        const modal = document.getElementById(id);
-                        if (modal && modal.classList.contains('modal--open')) {
-                            closeModal(id);
-                        }
-                    });
+                if (e.key !== 'Escape') return;
+
+                const warningModal = document.getElementById('warningModal');
+                if (warningModal && warningModal.classList.contains('modal--open')) {
+                    cancelPendingExpense();
+                    return;
                 }
+                // Alles Offene schliessen, nicht nach einer festen Liste.
+                // Die Liste hier war fest verdrahtet und hatte den Sparziel-
+                // Dialog bereits verpasst - sowas veraltet still.
+                const offen = document.querySelectorAll('.modal.modal--open');
+                if (offen.length) {
+                    offen.forEach(m => closeModal(m.id));
+                    return;
+                }
+                // Das Buchen-Sheet ist kein Modal, verhaelt sich fuer den
+                // Nutzer aber wie eines.
+                const sheet = document.getElementById('buchenSheet');
+                if (sheet && sheet.classList.contains('sheet--offen')) schliesseBuchen();
             });
+
+            // Tippen neben das Sheet schliesst es, wie bei den Modalen auch.
+            const sheet = document.getElementById('buchenSheet');
+            if (sheet) {
+                sheet.addEventListener('click', (e) => {
+                    if (e.target === sheet) schliesseBuchen();
+                });
+            }
 
             // Click outside closes modal
             document.querySelectorAll('.modal').forEach(modal => {
@@ -4247,13 +4276,22 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                     const noteHtml = tx.note ? ' · ' + escapeHtml(tx.note) : '';
                     const timeStr = new Date(tx.date).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
+                    // Das Symbol zeigt die Kategorie bereits. Sie daneben noch
+                    // auszuschreiben kostete den Platz, an dem dann die Notiz
+                    // abgeschnitten wurde ("Essen / Haushalt · W…"). Jetzt traegt
+                    // die Hauptzeile die Notiz, und die Kategorie rutscht in die
+                    // Nebenzeile zur Uhrzeit.
+                    const hatNotiz = !!(tx.note && tx.note.trim());
+                    const kopf = hatNotiz ? escapeHtml(tx.note.trim()) : label;
+                    const neben = hatNotiz ? `${timeStr} · ${label}` : timeStr;
+
                     return `
                         <div class="flex items-center justify-between bg-slate-900/60 rounded-xl px-3 py-2.5">
                             <div class="flex items-center gap-2.5 min-w-0">
                                 <span class="text-lg leading-none">${icon}</span>
                                 <div class="min-w-0">
-                                    <div class="text-[11px] text-slate-400">${timeStr}</div>
-                                    <div class="text-xs font-medium text-slate-200 truncate">${label}${noteHtml}</div>
+                                    <div class="text-xs font-medium text-slate-200 truncate">${kopf}</div>
+                                    <div class="text-[11px] text-slate-400 truncate">${neben}</div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
@@ -4524,109 +4562,67 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
         function renderSettingsSheet() {
             const content = document.getElementById('mehrInhalt');
             if (!content) return;
-            let html = '';
 
-            // Kassensturz ganz oben – der Wartungsvorgang, ohne den der abgeleitete
-            // Bestand mit der Zeit von der Wirklichkeit abdriftet
+            // Vorher eine flache Liste aus zehn zusammenhanglosen Eintraegen:
+            // "Bargeld nachzaehlen" stand neben "Backup importieren
+            // (zusammenfuehren)" - eine taegliche Handlung neben einer, die man
+            // vielleicht nie braucht. Jetzt nach Zweck gruppiert, in der
+            // Reihenfolge wie oft man sie braucht.
+            const gruppe = (titel, eintraege) => eintraege.filter(Boolean).length
+                ? `<div class="gruppe"><h3 class="gruppe__titel">${titel}</h3>${eintraege.filter(Boolean).join('')}</div>`
+                : '';
+            const eintrag = (beschriftung, aufruf, zusatz, gefahr) =>
+                `<button class="settings-sheet-item${gefahr ? ' danger' : ''}" onclick="${aufruf}">${beschriftung}`
+                + (zusatz ? `<span class="block-d text-[11px] text-slate-400 font-normal">${zusatz}</span>` : '')
+                + `</button>`;
+
             const tageSeitZaehlung = getDaysSinceLastCount();
             const zaehlHinweis = tageSeitZaehlung === null
                 ? 'noch nie gezählt'
                 : (tageSeitZaehlung === 0 ? 'heute gezählt'
                     : (tageSeitZaehlung === 1 ? 'vor 1 Tag' : `vor ${tageSeitZaehlung} Tagen`));
-            html += `
-                <button class="settings-sheet-item" onclick="openCashCountModal();">
-                    Bargeld nachzählen
-                    <span class="block text-[11px] text-slate-400 font-normal">${escapeHtml(zaehlHinweis)}</span>
-                </button>
-            `;
+            const ziel = Number(appState.settings && appState.settings.sparziel) || 0;
 
-            // Geldeingang & Zeitraum
-            html += `
-                <button class="settings-sheet-item" onclick="openPaydayModal();">
-                    Geldeingang & Zeitraum
-                </button>
-            `;
+            let html = '';
 
-            // Month Report
-            html += `
-                <button class="settings-sheet-item" onclick="openMonthReport();">
-                    Monatsabschluss
-                </button>
-            `;
+            html += gruppe('Geld', [
+                eintrag('Bargeld nachzählen', 'openCashCountModal();', escapeHtml(zaehlHinweis)),
+                eintrag('Sparziel', 'openSparzielModal();',
+                    ziel > 0 ? formatEuro(ziel) + ' bleiben zurückgelegt' : 'kein Sparziel gesetzt')
+            ]);
 
-            // Standard options
-            html += `
-                <button class="settings-sheet-item" onclick="exportBackup();">
-                    Backup exportieren
-                </button>
-            `;
+            html += gruppe('Planung', [
+                eintrag('Geldeingang &amp; Zeitraum', 'openPaydayModal();',
+                    'Zahltag am ' + (Number(appState.settings && appState.settings.paydayDay) || 1) + '. des Monats'),
+                eintrag('Kategorie-Budgets', 'openBudgetModal();')
+            ]);
 
-            // Import Replace
-            html += `
-                <button class="settings-sheet-item" onclick="document.getElementById('importFileReplace').click();">
-                    Backup importieren (ersetzen)
-                </button>
-                <input type="file" id="importFileReplace" accept="application/json" onchange="importBackup(event, 'replace')" style="display:none;">
-            `;
+            // "Als App einrichten" verschwindet, sobald sie eigenstaendig laeuft.
+            const appEintrag = canInstallApp()
+                ? eintrag('Als App installieren', 'triggerInstallPrompt();', 'eigenes Fenster statt Browser-Tab')
+                : (!istAlsAppInstalliert()
+                    ? eintrag('Als App einrichten', 'zeigeInstallationsWeg();', 'eigenes Fenster statt Browser-Tab')
+                    : null);
 
-            // Import Merge
-            html += `
-                <button class="settings-sheet-item" onclick="document.getElementById('importFileMerge').click();">
-                    Backup importieren (zusammenführen)
-                </button>
-                <input type="file" id="importFileMerge" accept="application/json" onchange="importBackup(event, 'merge')" style="display:none;">
-            `;
+            html += gruppe('Daten sichern', [
+                eintrag('Sicherung herunterladen', 'exportBackup();', 'alle Buchungen als Datei'),
+                eintrag('Sicherung einspielen', "document.getElementById('importFileReplace').click();",
+                    'ersetzt alles, was jetzt in der App steht')
+                + `<input type="file" id="importFileReplace" accept="application/json" onchange="importBackup(event, 'replace')" style="display:none;">`,
+                eintrag('Sicherung dazunehmen', "document.getElementById('importFileMerge').click();",
+                    'fügt fehlende Buchungen hinzu, behält die vorhandenen')
+                + `<input type="file" id="importFileMerge" accept="application/json" onchange="importBackup(event, 'merge')" style="display:none;">`
+            ]);
 
-            // Undo (conditional)
-            if (hasUndoSnapshot()) {
-                html += `
-                    <button class="settings-sheet-item" onclick="undoLastDestructive();">
-                        Letzte Aktion rückgängig
-                    </button>
-                `;
-            }
+            // Eigene Gruppe: das hat mit Daten nichts zu tun. Sie verschwindet
+            // ganz, sobald die App eigenstaendig laeuft.
+            html += gruppe('App', [appEintrag]);
 
-            // Einrichten als echte App. Der Eintrag stand bisher nur da, wenn
-            // Chrome von sich aus einen Installationsvorschlag anbot – wer den
-            // Moment verpasst hat, fand den Weg nie wieder. Ein Lesezeichen auf
-            // dem Startbildschirm oeffnet jedes Mal einen neuen Browser-Tab;
-            // eine installierte App bekommt ein eigenes Fenster.
-            if (canInstallApp()) {
-                html += `
-                    <button class="settings-sheet-item" onclick="triggerInstallPrompt();">
-                        Als App installieren
-                    </button>
-                `;
-            } else if (!istAlsAppInstalliert()) {
-                html += `
-                    <button class="settings-sheet-item" onclick="zeigeInstallationsWeg();">
-                        Als App einrichten
-                    </button>
-                `;
-            }
-
-            // Budget
-            html += `
-                <button class="settings-sheet-item" onclick="openSparzielModal();">
-                    Sparziel
-                    <span class="block-d text-[11px] text-slate-400 font-normal">${(Number(appState.settings && appState.settings.sparziel) || 0) > 0
-                        ? formatEuro(Number(appState.settings.sparziel)) + ' bleiben zurückgelegt'
-                        : 'kein Sparziel gesetzt'}</span>
-                </button>
-                <button class="settings-sheet-item" onclick="openBudgetModal();">
-                    Kategorie-Budgets
-                </button>
-            `;
-
-            // Divider
-            html += `<div class="modal-divider"></div>`;
-
-            // Reset (danger)
-            html += `
-                <button class="settings-sheet-item danger" onclick="resetAllData();">
-                    Alle Daten zurücksetzen
-                </button>
-            `;
+            const gefaehrlich = [
+                hasUndoSnapshot() ? eintrag('Letzte Aktion rückgängig', 'undoLastDestructive();') : null,
+                eintrag('Alle Daten zurücksetzen', 'resetAllData();', null, true)
+            ];
+            html += gruppe('Zurücksetzen', gefaehrlich);
 
             content.innerHTML = html;
         }
