@@ -1404,12 +1404,16 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             <form id="einkaufForm" onsubmit="saveEinkauf(event)" class="space-y-3">
                 <label class="schalter">
                     <input type="checkbox" id="einkaufAktiv" onchange="updateEinkaufVorschau()">
-                    <span>Jede Woche einen festen Betrag zurücklegen</span>
+                    <span>Für den Einkauf regelmäßig Geld zurücklegen</span>
                 </label>
                 <div id="einkaufFelder" class="space-y-3">
                     <div>
-                        <label for="einkaufBetrag" class="block-d text-xs font-medium text-slate-400 mb-1">Betrag je Einkauf (€)</label>
+                        <label for="einkaufBetrag" class="block-d text-xs font-medium text-slate-400 mb-1">Richtwert je Einkauf (€)</label>
                         <input type="text" id="einkaufBetrag" inputmode="decimal" placeholder="140,00" oninput="updateEinkaufVorschau()">
+                    </div>
+                    <div>
+                        <label for="einkaufAnzahl" class="block-d text-xs font-medium text-slate-400 mb-1">Wie viele davon zahlst du pro Zeitraum?</label>
+                        <input type="number" id="einkaufAnzahl" min="1" max="10" step="1" placeholder="3" oninput="updateEinkaufVorschau()">
                     </div>
                     <div>
                         <label for="einkaufTag" class="block-d text-xs font-medium text-slate-400 mb-1">Wochentag</label>
@@ -1429,6 +1433,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                     </div>
                 </div>
                 <p id="einkaufVorschau" class="text-xs text-slate-400 leading-relaxed"></p>
+                <p class="text-xs text-slate-500 leading-relaxed">Es wird nichts automatisch gebucht. Der Richtwert legt nur Geld zurück – nach dem Einkauf trägst du ein, was du wirklich bezahlt hast.</p>
                 <div class="flex gap-2 pt-2">
                     <button type="button" class="knopf knopf--still w-1/2" onclick="closeModal('einkaufModal')">Abbrechen</button>
                     <button type="submit" class="knopf knopf--haupt w-1/2">Speichern</button>
@@ -2740,7 +2745,17 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             const betrag = Number(e.betrag) || 0;
             const wochentag = Number(e.wochentag);
             if (!(betrag > 0) || !(wochentag >= 0 && wochentag <= 6)) return null;
-            return { betrag, wochentag, bis: e.bis || null };
+            // Wie oft im Zahlungszeitraum faellt der Einkauf auf einen selbst?
+            // Nicht jeder Einkaufstag ist einer: eine Woche im Monat zahlt
+            // jemand anderes. Ohne diese Zahl haelt die App in einem Monat mit
+            // vier Samstagen 560 EUR zurueck, wo 420 richtig waeren.
+            const anzahl = Number(e.anzahl);
+            return {
+                betrag,
+                wochentag,
+                bis: e.bis || null,
+                anzahl: (anzahl >= 1 && anzahl <= 10) ? Math.floor(anzahl) : 99
+            };
         }
 
         // Liegt dieser Tag noch im Zeitraum des Wocheneinkaufs?
@@ -2769,12 +2784,43 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             return n;
         }
 
-        // Was bis zum Zahltag noch fuer Einkaeufe gebraucht wird - heutiger
-        // Einkaufstag eingeschlossen, denn der ist noch nicht erledigt.
+        // Ist dieser Einkaufstag einer, den ICH zahle? Es sind die ersten
+        // 'anzahl' Einkaufstage des Zahlungszeitraums; der Rest faellt auf
+        // jemand anderen. Diese eine Frage beantwortet alles Weitere - so
+        // rechnen Rueckhalt, Tagesfreigabe und Wochentopf garantiert gleich.
+        function istMeinEinkaufstag(datum) {
+            const e = getEinkauf();
+            if (!e || !istEinkaufstag(datum)) return false;
+            const d = datum || new Date();
+            const start = getPeriodStart();
+            if (d.getTime() < start.getTime()) return false;
+            return zaehleEinkaufstage(start, d) < e.anzahl;
+        }
+
+        // Meine Einkaufstage von 'von' (einschliesslich) bis 'bis' (ausschliesslich).
+        function zaehleMeineEinkaufstage(von, bis) {
+            if (!getEinkauf()) return 0;
+            const d = new Date(von.getFullYear(), von.getMonth(), von.getDate());
+            const grenze = new Date(bis.getFullYear(), bis.getMonth(), bis.getDate());
+            let n = 0, schutz = 0;
+            while (d.getTime() < grenze.getTime() && schutz++ < 400) {
+                if (istMeinEinkaufstag(d)) n++;
+                d.setDate(d.getDate() + 1);
+            }
+            return n;
+        }
+
+        function offeneEinkaeufe() {
+            if (!getEinkauf()) return 0;
+            return zaehleMeineEinkaufstage(new Date(), getHorizonDate());
+        }
+
+        // Was bis zum Zahltag noch fuer Einkaeufe gebraucht wird. Der Betrag
+        // ist ein Richtwert - gebucht wird spaeter, was wirklich bezahlt wurde.
         function getEinkaufRueckhalt() {
             const e = getEinkauf();
             if (!e) return 0;
-            return zaehleEinkaufstage(new Date(), getHorizonDate()) * e.betrag;
+            return offeneEinkaeufe() * e.betrag;
         }
 
         // Vom Nutzer gesetzter Betrag, der bis zum Zahltag liegen bleiben
@@ -2800,7 +2846,8 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
         function getDailyLimit() {
             const e = getEinkauf();
-            return getAlltagssatz() + (e && istEinkaufstag() ? e.betrag : 0);
+            const heuteDran = e && istMeinEinkaufstag();
+            return getAlltagssatz() + (heuteDran ? e.betrag : 0);
         }
 
         // Was das Sparziel pro Tag kostet - die Zahl, die der Nutzer beim
@@ -3813,7 +3860,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             const ekHeute = getEinkauf();
             const ekZeile = document.getElementById('einkaufHeute');
             if (ekZeile) {
-                if (ekHeute && istEinkaufstag()) {
+                if (ekHeute && istMeinEinkaufstag()) {
                     ekZeile.classList.remove('hidden');
                     ekZeile.innerText = `Einkaufstag: ${formatEuro(ekHeute.betrag)} davon sind für den Wocheneinkauf.`;
                 } else {
@@ -4010,7 +4057,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             // durch Resttage" ergaebe dann nicht den Alltagssatz. Deshalb
             // bekommt dieser Tag seinen eigenen Satz.
             const heuteEinkauf = getEinkauf();
-            if (heuteEinkauf && istEinkaufstag() && bestand > 0) {
+            if (heuteEinkauf && istMeinEinkaufstag() && bestand > 0) {
                 zeigen(`Grundlage: Heute ist Einkaufstag. `
                     + `${formatEuro(getAlltagssatz())} Alltag + ${formatEuro(heuteEinkauf.betrag)} Einkauf `
                     + `= ${formatEuro(dailyLimit)} für heute.`);
@@ -4604,7 +4651,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             const morgen = new Date();
             morgen.setDate(morgen.getDate() + 1);
             const e = getEinkauf();
-            const einkaeufe = e ? zaehleEinkaufstage(start, morgen) * e.betrag : 0;
+            const einkaeufe = e ? zaehleMeineEinkaufstage(start, morgen) * e.betrag : 0;
             return getAlltagssatz() * tage + einkaeufe;
         }
 
@@ -4783,7 +4830,7 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
 
             const ek = getEinkauf();
             const einkaufHinweis = ek
-                ? `${formatEuro(ek.betrag)} jeden ${WOCHENTAGE[ek.wochentag]}`
+                ? `${formatEuro(ek.betrag)} · ${ek.anzahl < 99 ? ek.anzahl + '× pro Zeitraum' : 'jeden'} ${WOCHENTAGE[ek.wochentag]}`
                     + (ek.bis ? ` bis ${new Date(ek.bis + 'T12:00:00').toLocaleDateString('de-DE')}` : '')
                 : 'ausgeschaltet';
 
@@ -4842,6 +4889,8 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             const betrag = Number(e.betrag) || 0;
             document.getElementById('einkaufBetrag').value = betrag > 0 ? betrag.toFixed(2).replace('.', ',') : '';
             document.getElementById('einkaufTag').value = String(e.wochentag !== undefined ? e.wochentag : 6);
+            const anz = Number(e.anzahl);
+            document.getElementById('einkaufAnzahl').value = (anz >= 1 && anz <= 10) ? String(Math.floor(anz)) : '';
             document.getElementById('einkaufBis').value = e.bis || '';
             updateEinkaufVorschau();
             openModal('einkaufModal');
@@ -4861,26 +4910,38 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
             }
             const tag = Number(document.getElementById('einkaufTag').value);
             const bis = document.getElementById('einkaufBis').value || null;
+            const rohAnzahl = Number(document.getElementById('einkaufAnzahl').value);
+            const anzProZeitraum = (rohAnzahl >= 1 && rohAnzahl <= 10) ? Math.floor(rohAnzahl) : 99;
 
             // Probeweise rechnen, ohne den gespeicherten Stand anzufassen
-            const alt = appState.settings.einkauf;
-            appState.settings.einkauf = { aktiv: true, betrag, wochentag: tag, bis };
-            let anzahl = 0, rueckhalt = 0, alltag = 0;
+            const vorher = appState.settings.einkauf;
+            appState.settings.einkauf = { aktiv: true, betrag, wochentag: tag, bis, anzahl: anzProZeitraum };
+            let offen = 0, rueckhalt = 0, alltag = 0, imZeitraum = 0;
             try {
-                anzahl = zaehleEinkaufstage(new Date(), getHorizonDate());
+                offen = offeneEinkaeufe();
                 rueckhalt = getEinkaufRueckhalt();
                 alltag = getAlltagssatz();
+                imZeitraum = zaehleEinkaufstage(getPeriodStart(), getHorizonDate());
             } finally {
-                appState.settings.einkauf = alt;
+                appState.settings.einkauf = vorher;
             }
 
             el.style.color = '';
-            if (anzahl === 0) {
-                el.innerText = `Bis zum Zahltag fällt kein ${WOCHENTAGE[tag]} mehr in den Zeitraum.`;
+            if (offen === 0) {
+                el.innerText = imZeitraum === 0
+                    ? `Bis zum Zahltag fällt kein ${WOCHENTAGE[tag]} mehr in den Zeitraum.`
+                    : `In diesem Zeitraum stehen keine Einkäufe mehr an, die du zahlst.`;
                 return;
             }
-            el.innerText = `${anzahl} × ${WOCHENTAGE[tag]} bis zum Zahltag = ${formatEuro(rueckhalt)} zurückgelegt. `
-                + `Für alles andere bleiben ${formatEuro(alltag)} pro Tag.`;
+            // Die Aufteilung nur nennen, wenn sie ueberhaupt eine ist. Sonst
+            // stand da "4 im Zeitraum, davon zahlst du 4" neben "Noch 3" -
+            // stimmig, aber zum Stolpern.
+            const teilung = anzProZeitraum < imZeitraum
+                ? ` Du zahlst ${anzProZeitraum} von ${imZeitraum} ${WOCHENTAGE[tag]}en im Zeitraum.`
+                : '';
+            el.innerText = `Noch ${offen} ${offen === 1 ? 'Einkauf' : 'Einkäufe'} bis zum Zahltag.`
+                + teilung
+                + ` ${formatEuro(rueckhalt)} zurückgelegt, für alles andere bleiben ${formatEuro(alltag)} pro Tag.`;
         }
 
         function saveEinkauf(event) {
@@ -4905,11 +4966,14 @@ main { max-width: 28rem; margin: 0 auto; padding: 1rem; }
                 return;
             }
             const bis = document.getElementById('einkaufBis').value || null;
+            const rohAnzahl = Number(document.getElementById('einkaufAnzahl').value);
             appState.settings.einkauf = {
                 aktiv: true,
                 betrag,
                 wochentag: Number(document.getElementById('einkaufTag').value),
-                bis
+                bis,
+                // Ohne Angabe: jeder Einkaufstag gehoert mir.
+                anzahl: (rohAnzahl >= 1 && rohAnzahl <= 10) ? Math.floor(rohAnzahl) : 99
             };
             const gespeichert = saveToStorage();
             renderUI();
